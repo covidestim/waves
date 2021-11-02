@@ -8,11 +8,11 @@ using CategoricalArrays;
 neighbors = CSV.read(
   "neighbors.csv", DataFrame;
   # i = TO, j = FROM
-  types=Dict(:i => String, :j => String)
+  types = Dict(:i => String, :j => String)
 )
 
 results = CSV.read(
-  "results.csv", DataFrame;
+  ARGS[1], DataFrame;
   types=Dict(
     :fips         => String,
     :date         => Date,
@@ -90,3 +90,5 @@ model = lm(@formula(
     # (EMPTY) covariates
 
 ), joined)
+
+Serialization.serialize("model.hdf5", model)
