@@ -1,7 +1,8 @@
 using CSV;
 using DataFrames;
 using Dates;
-using GLM;
+using MixedModels;
+using StatsModels;
 using Pipe;
 using CategoricalArrays;
 
@@ -58,11 +59,14 @@ transform!(joined, [:i, :j, :date] =>
   => :interactionTerm
 )
 
-model = lm(@formula(
+model = fit(MixedModel, @formula(
   infectionsPC_i ~
-    # (EMPTY) Interaction term
-    interactionTerm +
-    # Lags
+    0 + 
+
+    # Interaction term (random effect)
+    (1 | interactionTerm) +
+
+    # Lags (fixed effects)
     infectionsPC_j_1 +
     infectionsPC_j_2 +
     infectionsPC_j_3 +
@@ -84,7 +88,7 @@ model = lm(@formula(
     infectionsPC_j_19 +
     infectionsPC_j_20 +
 
-    # Autocorr
+    # Autocorr (fixed effect)
     infectionsPC_i_1
 
     # (EMPTY) covariates
