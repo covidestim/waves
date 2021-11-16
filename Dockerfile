@@ -15,7 +15,7 @@ RUN apt-get update && \
 COPY . /opt/waves
 
 # Make the scripts runnable and install the Julia package dependencies
-RUN chmod a+rx /opt/waves/*.jl && \
+RUN chmod a+rx /opt/waves/**/*.jl && \
   cd /opt/waves && \
-  julia deps.jl
+  julia scripts/deps.jl
 

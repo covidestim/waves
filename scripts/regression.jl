@@ -1,18 +1,21 @@
 using CSV;
 using DataFrames;
 using Dates;
-using GLM;
+using MixedModels;
+using StatsModels;
 using Pipe;
 using CategoricalArrays;
 
+println("Reading neighbors.csv")
 neighbors = CSV.read(
   "neighbors.csv", DataFrame;
   # i = TO, j = FROM
   types = Dict(:i => String, :j => String)
 )
 
+println("Reading results.csv")
 results = CSV.read(
-  ARGS[1], DataFrame;
+  "results.csv", DataFrame;
   types=Dict(
     :fips         => String,
     :date         => Date,
@@ -21,12 +24,14 @@ results = CSV.read(
   )
 )
 
+println("Innerjoin #1")
 joined = innerjoin(
   neighbors, results; on = :i => :fips, renamecols = "" => "_i"
  )
 
 rename!(joined, :date_i => :date)
 
+println("Innerjoin #2")
 joined = innerjoin(
   joined, results; on = [:date, :j => :fips], renamecols = "" => "_j"
 )
@@ -45,6 +50,7 @@ function lagsForVariable(df, variable, lags)
   return transform!(df, transformers)
 end
 
+println("Assembling all lags for each observation")
 lagsForVariable(joined, :infectionsPC_j, 1:20)
 
 # ungroup:
@@ -52,17 +58,22 @@ joined = select(joined, All(); ungroup=true)
 
 filter!([:Rt_i] => rt -> rt >= 1, joined)
 
+println("Performing categorical encoding of interaction term")
 transform!(joined, [:i, :j, :date] =>
   ((i, j, date) -> 
     categorical(string.(i, "-", j, "-", year.(date), "-", month.(date))))
   => :interactionTerm
 )
 
-model = lm(@formula(
+println("Fitting mixed model")
+model = fit(MixedModel, @formula(
   infectionsPC_i ~
-    # (EMPTY) Interaction term
-    interactionTerm +
-    # Lags
+    0 + 
+
+    # Interaction term (random effect)
+    (1 | interactionTerm) +
+
+    # Lags (fixed effects)
     infectionsPC_j_1 +
     infectionsPC_j_2 +
     infectionsPC_j_3 +
@@ -84,11 +95,15 @@ model = lm(@formula(
     infectionsPC_j_19 +
     infectionsPC_j_20 +
 
-    # Autocorr
+    # Autocorr (fixed effect)
     infectionsPC_i_1
 
     # (EMPTY) covariates
 
-), joined)
+), joined, contrasts=Dict(:interactionTerm => Grouping()))
+println("Fit complete")
 
-Serialization.serialize("model.hdf5", model)
+effects = DataFrame(only(raneftables(model)))
+
+println("Writing `alphas.csv`")
+CSV.write("alphas.csv", effects)
