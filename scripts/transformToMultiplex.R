@@ -19,7 +19,7 @@ names(monthCodes) <- sort(levels(d$month))
 
 d <- filter(d, value >= 0)
 
-fips  <- intersect(unique(d$i), unique(d$j)) %>% sort
+fips  <- union(unique(d$i), unique(d$j)) %>% sort
 nFips <- length(fips)
 
 fipsCodes <- 1:nFips
@@ -44,6 +44,13 @@ cli_process_start("Writing {.file fips-code-mapping.csv}")
 write_csv(
   tibble(fips=names(fipsCodes), code=fipsCodes),
   "fips-code-mapping.csv"
+)
+cli_process_done()
+
+cli_process_start("Writing {.file month-code-mapping.csv}")
+write_csv(
+  tibble(month=names(monthCodes), code=monthCodes),
+  "month-code-mapping.csv"
 )
 cli_process_done()
 

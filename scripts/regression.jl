@@ -19,8 +19,9 @@ results = CSV.read(
   types=Dict(
     :fips         => String,
     :date         => Date,
+    :cases        => Float64,
     :Rt           => Float64,
-    :infectionsPC => Float64
+    :infections   => Float64
   )
 )
 
@@ -39,7 +40,7 @@ joined = innerjoin(
 sort!(joined, :date)
 
 joined = groupby(joined, [:i, :j])
-transform!(joined, :infectionsPC_i => (v -> lag(v, 1)) => :infectionsPC_i_1)
+transform!(joined, :cases_i => (v -> lag(v, 1)) => :cases_i_1)
 
 function lagsForVariable(df, variable, lags)
   transformers = map(
@@ -51,7 +52,7 @@ function lagsForVariable(df, variable, lags)
 end
 
 println("Assembling all lags for each observation")
-lagsForVariable(joined, :infectionsPC_j, 1:20)
+lagsForVariable(joined, :cases_j, 1:20)
 
 # ungroup:
 joined = select(joined, All(); ungroup=true)
@@ -67,36 +68,36 @@ transform!(joined, [:i, :j, :date] =>
 
 println("Fitting mixed model")
 model = fit(MixedModel, @formula(
-  infectionsPC_i ~
+  infections_i ~
     0 + 
 
     # Interaction term (random effect)
     (1 | interactionTerm) +
 
     # Lags (fixed effects)
-    infectionsPC_j_1 +
-    infectionsPC_j_2 +
-    infectionsPC_j_3 +
-    infectionsPC_j_4 +
-    infectionsPC_j_5 +
-    infectionsPC_j_6 +
-    infectionsPC_j_7 +
-    infectionsPC_j_8 +
-    infectionsPC_j_9 +
-    infectionsPC_j_10 +
-    infectionsPC_j_11 +
-    infectionsPC_j_12 +
-    infectionsPC_j_13 +
-    infectionsPC_j_14 +
-    infectionsPC_j_15 +
-    infectionsPC_j_16 +
-    infectionsPC_j_17 +
-    infectionsPC_j_18 +
-    infectionsPC_j_19 +
-    infectionsPC_j_20 +
+    cases_j_1 +
+    cases_j_2 +
+    cases_j_3 +
+    cases_j_4 +
+    cases_j_5 +
+    cases_j_6 +
+    cases_j_7 +
+    cases_j_8 +
+    cases_j_9 +
+    cases_j_10 +
+    cases_j_11 +
+    cases_j_12 +
+    cases_j_13 +
+    cases_j_14 +
+    cases_j_15 +
+    cases_j_16 +
+    cases_j_17 +
+    cases_j_18 +
+    cases_j_19 +
+    cases_j_20 +
 
     # Autocorr (fixed effect)
-    infectionsPC_i_1
+    cases_i_1
 
     # (EMPTY) covariates
 
@@ -104,6 +105,8 @@ model = fit(MixedModel, @formula(
 println("Fit complete")
 
 effects = DataFrame(only(raneftables(model)))
+
+println(model)
 
 println("Writing `alphas.csv`")
 CSV.write("alphas.csv", effects)

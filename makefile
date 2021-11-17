@@ -6,7 +6,7 @@ results.csv: scripts/pullLatestResults.R
 # Fit the mixed-effects model to the data, and write the estimates of the 
 # \alpha coefficients to disk
 alphas.csv: scripts/regression.jl neighbors.csv results.csv
-	julia scripts/regression.jl
+	julia scripts/regression.jl | tee julia.log
 
 # Reformat the Julia output to make it more machine-readable
 alphas_reformat.csv: scripts/transformResults.R alphas.csv
@@ -14,7 +14,7 @@ alphas_reformat.csv: scripts/transformResults.R alphas.csv
 
 # Prepare the machine-readable Julia fit data for the InfoMap routine by
 # transforming it into an explicitly graph-oriented representtation
-network.net fips-code-mapping.csv &: scripts/transformToMultiplex.R alphas_reformat.csv
+network.net month-code-mapping.csv fips-code-mapping.csv &: scripts/transformToMultiplex.R alphas_reformat.csv
 	@rm -f network.net
 	Rscript scripts/transformToMultiplex.R
 
