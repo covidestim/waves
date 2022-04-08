@@ -34,12 +34,13 @@ with the visualization code in the Observable notebooks
 2. Fits a mixed model to this data in Julia.
 
 3. Transforms the interaction coefficients from the mixed-model output so that
-   they can be fed to InfoMap as edge weights between adjacent geographies.
+   they can be fed to Infomap as edge weights between adjacent geographies.
 
-4. Runs Infomap in multilayer mode (one layer/month) in order to identify
-   neighborhoods of geographies
+4. Runs Infomap in [multilayer
+   mode](https://www.mapequation.org/infomap/#InputMultilayerIntra) (one
+   layer/month) in order to identify modules of geographies
 
-5. Reformats this InfoMap output a little bit so that it can be used more
+5. Reformats this Infomap output a little bit so that it can be used more
    easily within the Observable environment.
 
 To run the entire pipeline, after satisfying dependencies:
@@ -57,16 +58,9 @@ schema for these two files are described below.
 
 | Variable | Type   | Description |
 |----------|--------|-------------|
-| `module` | string | The module assigned to that geographic unit for that
-month. Of the form `a:b:c:d`, where `a` is the highest-level module and `d` is
-the lowest-level module. `a`,`b`,`c`,`d` are integers. A geographic unit may
-sometimes not be assigned into the deepest level of the module hierarchy for a
-particular month, whcih means that some units are simply assigned a module of
-the form `a`, `a:b`, or `a:b:c`. |
-| `fips`   | string | Geographic unit designator, currently the FIPS code of a
-county, but could be modified to instead represent a hexbin ID |
-| `month`  | integer | Month. Currently month `1` is the first month in the
-dataset. **Does not correspond to month of the year.**|
+| `module` | string | The module assigned to that geographic unit for that month. Of the form `a:b:c:d`, where `a` is the highest-level module and `d` is the lowest-level module. `a`,`b`,`c`,`d` are integers. A geographic unit may sometimes not be assigned into the deepest level of the module hierarchy for a particular month, whcih means that some units are simply assigned a module of the form `a`, `a:b`, or `a:b:c`. |
+| `fips`   | string | Geographic unit designator, currently the FIPS code of a county, but could be modified to instead represent a hexbin ID |
+| `month`  | integer | Month. Currently month `1` is the first month in the dataset. **Does not correspond to month of the year.**|
 
 ### `alphas_reformat.csv`
 
