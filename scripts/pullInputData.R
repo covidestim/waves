@@ -2,10 +2,10 @@ suppressPackageStartupMessages( library(tidyverse) )
 library(cli)
 suppressPackageStartupMessages( library(lubridate) )
 
-cli_process_start("Pulling latest input data from API")
+cli_process_start("Pulling 2021-12-02 input data from API")
 d1 <- read_csv(
   url(
-    "https://api.covidestim.org/latest_inputs?select=fips,date,cases",
+    "https://api.covidestim.org/inputs?rundate=eq.2021-12-02&select=fips,date,cases",
     headers = c("Accept" = "text/csv")
   ),
   col_types = cols(
@@ -16,10 +16,10 @@ d1 <- read_csv(
 )
 cli_process_done()
 
-cli_process_start("Pulling latest results from API")
+cli_process_start("Pulling 2021-12-02 results from API")
 d2 <- read_csv(
   url(
-    "https://api.covidestim.org/latest_results?select=fips,date,Rt,infections",
+    'https://api.covidestim.org/results?"run.date"=eq.2021-12-02&select=fips,date,Rt,infections',
     headers = c("Accept" = "text/csv")
   ),
   col_types = cols(
@@ -38,7 +38,7 @@ cli_alert_info("All dates will be less than {.code {maxDate}}")
 
 d2 <- filter(d2, date < maxDate)
 
-cli_alert_info("Inner-joining Rts to input data")
+cli_alert_info("Inner-joining model results to input data")
 
 d3 <- inner_join(d1, d2, by=c("fips", "date"))
 

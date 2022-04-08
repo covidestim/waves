@@ -1,7 +1,7 @@
-# Pull latest model results from the API, but only the important variables,
-# and cut off the last ~1.5 months
-results.csv: scripts/pullLatestResults.R
-	Rscript scripts/pullLatestResults.R
+# Pull model results and case counts from the API, but only the important
+# variables, and cut off the last ~1.5 months
+results.csv: scripts/pullInputData.R
+	Rscript scripts/pullInputData.R
 
 # Fit the mixed-effects model to the data, and write the estimates of the 
 # \alpha coefficients to disk
