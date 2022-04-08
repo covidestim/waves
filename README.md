@@ -38,7 +38,9 @@ with the visualization code in the Observable notebooks
 
 4. Runs Infomap in [multilayer
    mode](https://www.mapequation.org/infomap/#InputMultilayerIntra) (one
-   layer/month) in order to identify modules of geographies
+   layer/month) in order to identify modules of geographies. For a detailed
+   description of what is going on here, see [this](https://www.mapequation.org/apps/multilayer-network/index.html)
+   demonstration.
 
 5. Reformats this Infomap output a little bit so that it can be used more
    easily within the Observable environment.
