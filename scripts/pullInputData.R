@@ -11,7 +11,7 @@ d1 <- read_csv(
   col_types = cols(
     fips = col_character(),
     date = col_date(),
-    cases = col_number(),
+    cases = col_number()
   )
 )
 cli_process_done()
