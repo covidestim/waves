@@ -1,3 +1,16 @@
+county_polygons := county_polygons.topojson
+cbg_polygons := cbg-polygons/cb_2019_us_bg_500k.shp
+cbg_popsize := cbg_popsize.csv
+
+hexid-fips-map.csv hexes.shp &: scripts/hexbin.R $(county_polygons) $(cbg_polygons) $(cbg_popsize)
+	Rscript scripts/hexbin.R \
+          --save-csv hexid-fips-map.csv \
+	  --save-shp hexes.shp \
+	  --county-polygons $(county_polygons) \
+	  --cbg-polygons $(cbg_polygons) \
+	  --cbg-popsize $(cbg_popsize) \
+	  --hexsize 25
+
 # Pull model results and case counts from the API, but only the important
 # variables, and cut off the last ~1.5 months
 results.csv: scripts/pullInputData.R
