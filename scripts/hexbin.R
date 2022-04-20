@@ -1,5 +1,5 @@
 suppressPackageStartupMessages( library(sf) )
-library(geojsonio, warn.conflicts = F)
+suppressPackageStartupMessages( library(geojsonio) )
 library(magrittr, warn.conflicts = F)
 library(ggplot2, warn.conflicts = F)
 library(dplyr, warn.conflicts = F)
@@ -8,16 +8,15 @@ library(docopt, warn.conflicts = F)
 library(cli, warn.conflicts = F)
 library(readr, warn.conflicts = F)
 
-
-'US hex-grid generator
+'Waves project: US hex-grid generator
 
 Usage:
-  hexbin.R --save-csv <path> --save-shp <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> --hexsize <num>
+  hexbin.R --save-csv <path> --save-shp <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>]
   hexbin.R (-h | --help)
   hexbin.R --version
 
 Options:
-  --save-csv <path>         Where to save CSV of [hexid,fips,proportion]
+  --save-csv <path>         Where to save CSV of [hexid,fips,proportion1,proportion2]
   --save-shp <path>         Where to save SHP of hexes, with fields [hexid]
   --county-polygons <path>  Path to TopoJSON of EPSG4326 county boundaries
   --cbg-polygons <path>     Path to TIGER SHP of CBG polygons
@@ -33,8 +32,21 @@ pd <- cli_process_done
 
 args <- docopt(doc, version = 'hexbin.R 0.1')
 
-ps("Loading county polygons from {.file {args$county_polygons}}")
-counties <- topojson_read(args$county_polygons, layer = "counties")
+# The TopoJSON file is read in, the counties layer is selected, then the data
+# is converted to a `sf`. Some of these geometries are invalid because of how
+# the S2 geometry backend deals with lat/long data. See discussion here:
+#
+# https://github.com/r-spatial/sf/issues/1649
+#
+# Anyway, `st_make_valid` fixes the problems but it's apparently important to
+# reassign the result of this call in order to avoid a stale reference to the
+# unrepaired data (or at least I think that's what's going on.
+ps("Loading county polygons from {.file {args$county_polygons}}, then reprojecting")
+counties_raw <- topojson_read(args$county_polygons, layer = "counties") %>%
+  st_make_valid() 
+st_crs(counties_raw) <- 4326 # This TopoJSON doesn't encode the CRS maybe
+counties <- st_make_valid(counties_raw)
+rm(counties_raw)
 pd()
 
 ps("Loading CBG polygons from {.file {args$cbg_polygons}}")
@@ -42,12 +54,18 @@ cbgs <- read_sf(args$cbg_polygons)
 pd()
 
 ps("Loading CBG popsizes from {.file {args$cbg_popsize}}")
-cbg_popsize <- read_csv(args$cbg_popsize, col_types = cols(GEOID = col_character(), population = col_number()))
+cbg_popsize <- read_csv(
+  args$cbg_popsize,
+  col_types = cols(GEOID = col_character(), population = col_number())
+)
 pd()
 
 hexsize <- as.numeric(args$hexsize)
-cli_alert_info("Hexsize will be {.val {hexsize}}")
+cli_alert_info("Hexsize will be ~{.val {hexsize}}mi")
 
+# Crude formula to try and make the grid size change-able in a meaningful
+# way.
+# TODO: Deserves additional scrutiny.
 miles_to_degrees <- function(miles) {
   earth_radius <- 3960
   radians_to_degrees <- 180/pi
@@ -57,26 +75,113 @@ miles_to_degrees <- function(miles) {
 ps("Creating hexgrid")
 hexgrid <- st_make_grid(
   counties,
-  square = F,
-  cellsize = miles_to_degrees(hexsize) %>% rep(2)
-) %>% st_as_sf %>% st_filter(counties, .predicate = st_intersects)
+  square = F, # Means "create hexagons"
+  cellsize = miles_to_degrees(hexsize) %>% rep(2) # width/height
+) %>%
+  st_as_sf %>%
+  # Eliminate the hexes that don't intersect any counties.
+  # I.e. the hexes in the Pacific Ocean etc (b/c Hawaii)
+  st_filter(counties, .predicate = st_intersects) %>%
+  # Assign serial ID to each hex.
+  mutate(hexid = 1:n())
 pd()
-                        
+cli_alert_info("{.val {nrow(hexgrid)}} hexes created")
+
+# Since we'll need the hexes for graphing later on, save them to a shapefile
+#
+# TODO: export to TopoJSON (plays nicer with Observable and may actually save
+# lots of space because every edge is used twice.
 ps("Writing hexgrid shapefile to {.file {args$save_shp}}")
-st_write(hexgrid, args$save_shp, append = F)
+st_write(hexgrid, args$save_shp, append = F) # Forces overwrite
 pd()
 
-# connecticut_counties <- counties %>%
-#   filter(
-#     str_detect(id, "^06")
-#     # str_detect(id, "^09") |
-#     # str_detect(id, "^36") |
-#     # str_detect(id, "^42")
-#   )
-# 
-# connecticut_hexes <- st_filter(hexgrid, connecticut_counties)
-# 
-# ggplot() +
-#   geom_sf(data = connecticut_hexes) +
-#   geom_sf(data = connecticut_counties, color = "red", fill = NA)
-# 
+# Join the CBG population data to the CBG polygons. This results in a loss of
+# ~3000 CBGs (out of 217k). Some CBGs have 0 population.
+#
+# TODO: Why are we losing these polygons and how much does that matter? Are
+#   some of these lost polygons concentrated in any particular part of the
+#   country?
+#
+# The GEOIDs used in the two datasets have slightly different formats, so
+# one of them is chopped to match the other.
+#
+# Then, the centroids of each CBG are calculated. This is done so that each
+# CBG is within at most one hex - since otherwise it would be possible for the
+# polygonal shape of a CBG to intersect two hexes, which would make things
+# needlessly complicated.
+ps("Joining population data to CBG polygons and calculating CBG centroids")
+cbgpop_centroids <- mutate(cbg_popsize, GEOID = str_sub(GEOID, 8, 19)) %>%
+  inner_join(cbgs, by = 'GEOID') %>%
+  transmute(
+    GEOID,
+    fips = paste0(STATEFP, COUNTYFP),
+    population,
+    geometry
+  ) %>%
+  st_as_sf() %>%
+  # Best to reproject to the counties' CRS before doing any geographic ops
+  st_transform(4326) %>%
+  mutate(geometry = st_centroid(geometry))
+pd()
+
+# This is where we generate the first key mapping: which CBGs are in which
+# counties, and which counties are those CBGs in?
+#
+# Note that we conveniently already have the FIPS code for each CBG.
+ps("Joining CBG centroids to hexgrid polygons using {.code st_nearest_feature} operator")
+cbgs_with_hexid <- st_join(cbgpop_centroids, hexgrid, join = st_within) %>%
+  select(GEOID, fips, population, hexid) %>%
+  as_tibble
+pd()
+
+# Calculate the population of each county by summming up the CBGs in each
+# county. This is advantageous because we want everything to sum to 1, which
+# isn't likely to happen if we rely on an external source of FIPS population
+# data.
+ps("Calculating county-population using CBG data")
+fipspop_according_to_cbgs <- as_tibble(cbgpop_centroids) %>%
+  select(-GEOID, -geometry) %>%
+  group_by(fips) %>%
+  # Last I checked there are some NAs in the CBG-level population file
+  summarize(fipspop = sum(population, na.rm = T)) 
+pd()
+cli_alert_info("U.S. population is {.val {sum(fipspop_according_to_cbgs$fipspop)}} according to CBG data")
+
+# 1. Associate the CBGs to the population of their enclosing county
+# 2. Compute each hex's population using CBG pop data
+# 3. Calculate the:
+#   - `proportion_from_fips`: Proportion of the hex's population that comes
+#       from each intersecting FIPS.
+#       => We need this to interpolate rate-based observations
+#
+#   - `proportion_of_fips`: Proportion of the intersecting FIPS's population
+#       which lies within the hex.
+#       => We need this to interpolate incidence observations, like raw cases
+ps("Creating hexid-FIPS mapping + proportions")
+mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %>%
+  group_by(hexid) %>%
+  mutate(hexpop = sum(population, na.rm = T)) %>%
+  group_by(hexid, fips) %>%
+  summarize(
+    proportion_from_fips = sum(population, na.rm = T)/first(hexpop),
+    proportion_of_fips = sum(population, na.rm = T)/first(fipspop),
+    .groups = 'drop'
+  )
+pd()
+cli_alert_info("{.val {nrow(mapping)}} intersections added to mapping")
+
+ps("Creating hexid-FIPS mapping + proportions to {.file {args$save_csv}}")
+write_csv(mapping, args$save_csv)
+pd()
+
+# TODO:
+#
+# - Write a script to do the interpolation. Best to have as a separate script
+#   to avoid paying the cost of generating the mapping over and over.
+#
+# - Verify that the mapping is good
+#
+# - Make some plots of the mapping and see if we like the hexsize, etc.
+#
+# - There are a small number of NAs in the output. Why is that and what should
+#   we do about it?
