@@ -5,6 +5,9 @@ county_polygons := $(ds)/county_polygons.topojson
 cbg_polygons    := $(ds)/cbg-polygons/cb_2019_us_bg_500k.shp
 cbg_popsize     := $(ds)/cbg_popsize.csv
 
+clean:
+	@rm -rf data-products/*
+
 $(dp)/hexid-fips-map.csv $(dp)/hexes.shp &: scripts/hexbin.R $(county_polygons) $(cbg_polygons) $(cbg_popsize)
 	Rscript scripts/hexbin.R \
           --save-csv $(dp)/hexid-fips-map.csv \
@@ -13,6 +16,10 @@ $(dp)/hexid-fips-map.csv $(dp)/hexes.shp &: scripts/hexbin.R $(county_polygons) 
 	  --cbg-polygons $(cbg_polygons) \
 	  --cbg-popsize $(cbg_popsize) \
 	  --hexsize 25
+
+all: counties hexes
+
+counties: $(counties)/observable/network-processed.csv
 
 # Reads the hex shapefile created in hexbin.R and creates neighbors dataframe
 neighbors_hex.csv: scripts/neighbors.R hexes.shp
