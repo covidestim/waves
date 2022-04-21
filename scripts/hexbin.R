@@ -11,12 +11,12 @@ library(readr, warn.conflicts = F)
 'Waves project: US hex-grid generator
 
 Usage:
-  hexbin.R --save-csv <path> --save-shp <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>]
+  hexbin.R --save-mapping <path> --save-shp <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>]
   hexbin.R (-h | --help)
   hexbin.R --version
 
 Options:
-  --save-csv <path>         Where to save CSV of [hexid,fips,proportion1,proportion2]
+  --save-mapping <path>     Where to save CSV of [hexid,fips,proportion1,proportion2]
   --save-shp <path>         Where to save SHP of hexes, with fields [hexid]
   --county-polygons <path>  Path to TopoJSON of EPSG4326 county boundaries
   --cbg-polygons <path>     Path to TIGER SHP of CBG polygons
@@ -179,8 +179,8 @@ mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %
 pd()
 cli_alert_info("{.val {nrow(mapping)}} intersections added to mapping")
 
-ps("Creating hexid-FIPS mapping + proportions to {.file {args$save_csv}}")
-write_csv(mapping, args$save_csv)
+ps("Creating hexid-FIPS mapping + proportions to {.file {args$save_mapping}}")
+write_csv(mapping, args$save_mapping)
 pd()
 
 # TODO:
