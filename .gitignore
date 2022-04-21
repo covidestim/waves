@@ -1,11 +1,1 @@
-alphas.csv
-alphas_reformat.csv
-fips-code-mapping.csv
-julia.log
-month-code-mapping.csv
-network-processed.csv
-network.log
-network.net
-network.tree
-network_states.tree
-results.csv
+data-products/*
