@@ -42,6 +42,7 @@ args <- docopt(doc, version = 'hexbin.R 0.1')
 # reassign the result of this call in order to avoid a stale reference to the
 # unrepaired data (or at least I think that's what's going on.
 ps("Loading county polygons from {.file {args$county_polygons}}, then reprojecting")
+# counties_raw <- topojson_read(args$county_polygons, layer = "counties", crs = st_crs(4326)) %>%
 counties_raw <- topojson_read(args$county_polygons, layer = "counties") %>%
   st_make_valid() 
 # missing geometries cause hexgrid() to fail below; check for NA and print
