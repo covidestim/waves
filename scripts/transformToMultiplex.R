@@ -1,10 +1,30 @@
 suppressPackageStartupMessages( library(tidyverse) )
 suppressPackageStartupMessages( library(glue) )
 suppressPackageStartupMessages( library(cli) )
+library(docopt)
 
-cli_process_start("Reading {.file alphas_reformat.csv}")
+'Waves project: transform hex/county-specific alphas into multiplex encoding
+
+Usage:
+  transformToMultiplex.R --save-network <path> --save-monthcode-mapping <path> --save-fips-mapping <path> --alphas-reformat <path>
+  transformToMultiplex.R (-h | --help)
+  transformToMultiplex.R --version
+
+Options:
+  --save-network <path>            Where to save the .net multiplex file
+  --save-monthcode-mapping <path>  Where to save the monthcode mapping
+  --save-fips-mapping <path>       Where to save the FIPS mapping
+  --alphas-reformat <path>         Where the reformatted alphas are for each FIPS 
+  -h --help  Show this screen.
+  --version  Show version.
+
+' -> doc
+
+args <- docopt(doc, version = 'transformToMultiplex.R 0.1')
+
+cli_process_start("Reading {.file {args$alphas_reformat}}")
 d <- read_csv(
-  "alphas_reformat.csv",
+  args$alphas_reformat,
   col_types = cols(
     i = col_character(),
     j = col_character(),
@@ -40,34 +60,34 @@ edges_str <- glue_data(edges, "{layer} {j} {i} {weight}")
 
 cli_alert_success("Finished data transformations")
 
-cli_process_start("Writing {.file fips-code-mapping.csv}")
+cli_process_start("Writing FIPS code mapping: {.file {args$save_fips_mapping}}")
 write_csv(
   tibble(fips=names(fipsCodes), code=fipsCodes),
-  "fips-code-mapping.csv"
+  args$save_fips_mapping
 )
 cli_process_done()
 
-cli_process_start("Writing {.file month-code-mapping.csv}")
+cli_process_start("Writing month code mapping: {.file {args$save_month_mapping}}")
 write_csv(
   tibble(month=names(monthCodes), code=monthCodes),
-  "month-code-mapping.csv"
+  args$save_monthcode_mapping
 )
 cli_process_done()
 
 # .net file
 
-cli_process_start("Writing {.file network.net}")
+cli_process_start("Writing multiplex network file: {.file {args$save_network}}")
 write_file(
   glue("*Vertices {nVertices}
 
 "),
-  "network.net",
-  append=T
+  args$save_network,
+  append=T # Suspect...currently relies on makefile to delete any old files
 )
 
 write_csv(
   tibble(vertices=vertices_str),
-  "network.net",
+  args$save_network,
   append=T, col_names=F, escape="none", quote="none"
 )
 
@@ -75,13 +95,13 @@ write_file(
   "# layer node node weight
 *Intra
 ",
-  "network.net",
+  args$save_network,
   append=T
 )
 
 write_csv(
   tibble(vertices=edges_str),
-  "network.net",
+  args$save_network,
   append=T, col_names=F, escape="none", quote="none"
 )
 
