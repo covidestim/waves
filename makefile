@@ -35,13 +35,13 @@ $(dp)/covidestim-observations.csv: scripts/pullInputData.R
 
 # Fit the mixed-effects model to the data, and write the estimates of the 
 # \alpha coefficients to disk
-$(dp)/alphas.csv: scripts/regression.jl $(dp)/neighbors.csv $(dp)/covidestim-observations.csv
+$(dp)/alphas.csv: scripts/regression.jl $(ds)/fips-neighbors.csv $(dp)/covidestim-observations.csv
 	julia scripts/regression.jl \
 		-o $@ \
 		--key fips \
-		--neighbors $(dp)/neighbors.csv \
-		--observations $(dp)/covidestim-observations.csv
-		| tee julia.log
+		--neighbors $(ds)/fips-neighbors.csv \
+		--observations $(dp)/covidestim-observations.csv | \
+	tee $(dp)/julia.log
 
 # Reformat the Julia output to make it more machine-readable
 $(dp)/alphas-reformat.csv: scripts/transformResults.R $(dp)/alphas.csv
