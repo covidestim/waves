@@ -72,7 +72,8 @@ $(counties_infomap_inputs)&: scripts/transformToMultiplex.R \
 	Rscript scripts/transformToMultiplex.R \
 	  --save-network           $(counties)/infomap/network.net \
 	  --save-monthcode-mapping $(counties)/infomap/month-code-mapping.csv \
-	  --save-fips-mapping      $(counties)/infomap/fips-code-mapping.csv \
+	  --save-geo-mapping       $(counties)/infomap/fips-code-mapping.csv \
+	  --key                    fips \
 	  --alphas-reformat        $(counties)/mixedmodel/alphas-reformat.csv
 
 # Run InfoMap on the network and save its output and logs

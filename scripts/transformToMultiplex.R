@@ -6,15 +6,16 @@ library(docopt)
 'Waves project: transform hex/county-specific alphas into multiplex encoding
 
 Usage:
-  transformToMultiplex.R --save-network <path> --save-monthcode-mapping <path> --save-fips-mapping <path> --alphas-reformat <path>
+  transformToMultiplex.R --save-network <path> --save-monthcode-mapping <path> --save-geo-mapping <path> --key <key> --alphas-reformat <path>
   transformToMultiplex.R (-h | --help)
   transformToMultiplex.R --version
 
 Options:
   --save-network <path>            Where to save the .net multiplex file
   --save-monthcode-mapping <path>  Where to save the monthcode mapping
-  --save-fips-mapping <path>       Where to save the FIPS mapping
-  --alphas-reformat <path>         Where the reformatted alphas are for each FIPS 
+  --save-geo-mapping <path>        Where to save the geo (fips/hexid) mapping
+  --key <key>                      Key that uniquely identifies a geographs (fips/hexid)
+  --alphas-reformat <path>         Path to reformatted alphas for each geo (fips/hexid) 
   -h --help  Show this screen.
   --version  Show version.
 
@@ -39,20 +40,20 @@ names(monthCodes) <- sort(levels(d$month))
 
 d <- filter(d, value >= 0)
 
-fips  <- union(unique(d$i), unique(d$j)) %>% sort
-nFips <- length(fips)
+geos  <- union(unique(d$i), unique(d$j)) %>% sort
+nGeos <- length(geos)
 
-fipsCodes <- 1:nFips
-names(fipsCodes) <- fips
-nVertices <- length(fipsCodes)
+geoCodes <- 1:nGeos
+names(geoCodes) <- geos
+nVertices <- length(geoCodes)
 
-vertices_str <- glue("{fipsCodes} \"{names(fipsCodes)}\"")
+vertices_str <- glue("{geoCodes} \"{names(geoCodes)}\"")
 
 edges <- transmute(
   d,
   layer  = monthCodes[month],
-  j      = fipsCodes[j],
-  i      = fipsCodes[i],
+  j      = geoCodes[j],
+  i      = geoCodes[i],
   weight = value
 )
 
@@ -60,11 +61,18 @@ edges_str <- glue_data(edges, "{layer} {j} {i} {weight}")
 
 cli_alert_success("Finished data transformations")
 
-cli_process_start("Writing FIPS code mapping: {.file {args$save_fips_mapping}}")
-write_csv(
-  tibble(fips=names(fipsCodes), code=fipsCodes),
-  args$save_fips_mapping
-)
+cli_process_start("Writing geo code mapping: {.file {args$save_geo_mapping}}")
+if (args$key == "fips") {
+  write_csv(
+    tibble(fips=names(geoCodes), code=geoCodes),
+    args$save_geo_mapping
+  )
+} else {
+  write_csv(
+    tibble(hexid=names(geoCodes), code=geoCodes),
+    args$save_geo_mapping
+  )
+}
 cli_process_done()
 
 cli_process_start("Writing month code mapping: {.file {args$save_month_mapping}}")
