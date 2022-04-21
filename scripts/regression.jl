@@ -5,36 +5,59 @@ using MixedModels;
 using StatsModels;
 using Pipe;
 using CategoricalArrays;
+using DocOpt;
 
-println("Reading neighbors.csv")
+doc = """Waves project: mixed-model
+
+Usage:
+  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path>
+  regression.jl (-h | --help)
+  regression.jl --version
+
+Options:
+  -o <path>              Where to save the interaction terms and their intercepts
+  --key <colname>        Key to group on ("fips" or "hexid")
+  --neighbors <path>     Path to a CSV listing all neighbors [i, j]
+  --observations <path>  Path to observations for each FIPS or hexid
+  -h --help              Show this screen.
+  --version              Show version.
+
+"""
+
+args = docopt(doc, version=v"0.1")
+
+geosym = Symbol(args["--key"])
+println("Geographic grouping unit is ", args["--key"])
+
+println("Reading ", args["--neighbors"])
 neighbors = CSV.read(
-  "neighbors.csv", DataFrame;
+  args["--neighbors"], DataFrame;
   # i = TO, j = FROM
   types = Dict(:i => String, :j => String)
 )
 
-println("Reading results.csv")
+println("Reading ", args["--observations"])
 results = CSV.read(
-  "results.csv", DataFrame;
+  args["--observations"], DataFrame;
   types=Dict(
-    :fips         => String,
-    :date         => Date,
-    :cases        => Float64,
-    :Rt           => Float64,
-    :infections   => Float64
+    geosym      => String,
+    :date       => Date,
+    :cases      => Float64,
+    :Rt         => Float64,
+    :infections => Float64
   )
 )
 
 println("Innerjoin #1")
 joined = innerjoin(
-  neighbors, results; on = :i => :fips, renamecols = "" => "_i"
+  neighbors, results; on = :i => geosym, renamecols = "" => "_i"
  )
 
 rename!(joined, :date_i => :date)
 
 println("Innerjoin #2")
 joined = innerjoin(
-  joined, results; on = [:date, :j => :fips], renamecols = "" => "_j"
+  joined, results; on = [:date, :j => geosym], renamecols = "" => "_j"
 )
 
 sort!(joined, :date)
@@ -108,5 +131,5 @@ effects = DataFrame(only(raneftables(model)))
 
 println(model)
 
-println("Writing `alphas.csv`")
-CSV.write("alphas.csv", effects)
+println("Writing alphas: ", args["-o"])
+CSV.write(args["-o"], effects)
