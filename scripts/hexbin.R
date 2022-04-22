@@ -44,9 +44,17 @@ args <- docopt(doc, version = 'hexbin.R 0.1')
 ps("Loading county polygons from {.file {args$county_polygons}}, then reprojecting")
 counties_raw <- topojson_read(args$county_polygons, layer = "counties") %>%
   st_make_valid() 
-st_crs(counties_raw) <- 4326 # This TopoJSON doesn't encode the CRS maybe
-counties <- st_make_valid(counties_raw)
-rm(counties_raw)
+# missing geometries cause hexgrid() to fail below; check for NA and print
+# the number of counties removed.
+counties_na <- counties_raw %>%  tidyr::drop_na()  
+if (dim(counties_raw)[1] > dim(counties_na)[1]) {
+  diff_dim <- dim(counties_raw)[1] - dim(counties_na)[1]
+  cli_progress_step(paste(diff_dim, " county(ies) dropped due to missing geometry."))
+}
+
+st_crs(counties_na) <- 4326 # This TopoJSON doesn't encode the CRS maybe
+counties <- st_make_valid(counties_na)
+rm(counties_raw); rm(counties_na)
 pd()
 
 ps("Loading CBG polygons from {.file {args$cbg_polygons}}")
