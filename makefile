@@ -11,6 +11,13 @@ hexid-fips-map.csv hexes.shp &: scripts/hexbin.R $(county_polygons) $(cbg_polygo
 	  --cbg-popsize $(cbg_popsize) \
 	  --hexsize 25
 
+# Reads the hex shapefile created in hexbin.R and creates neighbors dataframe
+hex_polygons := hexes.shp
+
+neighbors_hex.csv &: scripts/neighbors.R $(hex_polygons)
+	Rscript scripts/neighbors.R \
+	--hex-polygons $(hex_polygons)
+
 # Pull model results and case counts from the API, but only the important
 # variables, and cut off the last ~1.5 months
 results.csv: scripts/pullInputData.R
