@@ -96,7 +96,6 @@ hexgrid <- st_make_grid(
   # Assign serial ID to each hex.
   mutate(hexid = 1:n())
 pd()
-cli_alert_info("{.val {nrow(hexgrid)}} hexes created")
 
 # Since we'll need the hexes for graphing later on, save them to a shapefile
 if (!is.null(args$save_shp)) {
@@ -143,6 +142,7 @@ pd()
 # needlessly complicated.
 ps("Joining population data to CBG polygons and calculating CBG centroids")
 cbgpop_centroids <- mutate(cbg_popsize, GEOID = str_sub(GEOID, 8, 19)) %>%
+  filter(!is.na(population)) %>%
   inner_join(cbgs, by = 'GEOID') %>%
   transmute(
     GEOID,
@@ -161,7 +161,8 @@ pd()
 #
 # Note that we conveniently already have the FIPS code for each CBG.
 ps("Joining CBG centroids to hexgrid polygons using {.code st_nearest_feature} operator")
-cbgs_with_hexid <- st_join(cbgpop_centroids, hexgrid, join = st_within) %>%
+cbgs_with_hexid <- 
+  st_join(cbgpop_centroids, hexgrid, join = st_nearest_feature, left = F) %>%
   select(GEOID, fips, population, hexid) %>%
   as_tibble
 pd()
@@ -193,6 +194,8 @@ ps("Creating hexid-FIPS mapping + proportions")
 mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %>%
   group_by(hexid) %>%
   mutate(hexpop = sum(population, na.rm = T)) %>%
+  ungroup %>%
+  filter(hexpop > 0) %>%
   group_by(hexid, fips) %>%
   summarize(
     proportion_from_fips = sum(population, na.rm = T)/first(hexpop),
@@ -201,6 +204,7 @@ mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %
   )
 pd()
 cli_alert_info("{.val {nrow(mapping)}} intersections added to mapping")
+cli_alert_info("{.val {length(unique(mapping$hexid))}} hexes in the mapping")
 
 ps("Creating hexid-FIPS mapping + proportions to {.file {args$save_mapping}}")
 write_csv(mapping, args$save_mapping)
