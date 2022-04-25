@@ -95,36 +95,17 @@ $(counties)/observable/network-processed.csv: $(counties)/infomap/network_states
 ##############################################################################
 hex_geo_deps := $(county_polygons) $(cbg_polygons) $(cbg_popsize)
 
-$(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp &: scripts/hexbin.R $(hex_geo_deps)
+$(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp $(hexes)/hexes.geojson $(hexes)/hexid-neighbors.csv &: scripts/hexbin.R $(hex_heo_deps)
+	@mkdir -p $(hexes)
 	Rscript scripts/hexbin.R \
-          --save-mapping    $(hexes)/hexid-fips-map.csv \
-	  --save-shp        $(hexes)/hexes.shp \
-	  --county-polygons $(county_polygons) \
-	  --cbg-polygons    $(cbg_polygons) \
-	  --cbg-popsize     $(cbg_popsize) \
-	  --hexsize         25
-
-# Reads the hex shapefile created in hexbin.R and creates neighbors dataframe
-$(hexes)/hexid-neighbors.csv: scripts/neighbors.R $(hexes)/hexes.shp
-	Rscript scripts/neighbors.R -o $@ --hex-polygons $(hexes)/hexes.shp
-
-# The below version adds support for the as-yet-unimplemented --save-neighbors
-#   option, which saves a CSV detailing each hexagon's neighboring hexagons.
-#
-#   It also adds support for per-hex observations, assuming we choose to locate
-#   that functionality in this script.
-#
-# $(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp $(hexes)/hexid-neighbors.csv $(hexes)/hexid-observations.csv &: scripts/hexbin.R $(county_polygons) $(cbg_polygons) $(cbg_popsize) $(dp)/covidestim-observations.csv
-# 	Rscript scripts/hexbin.R \
-#	  --save-observations $(hexes)/hexid-observations.csv \
-#         --save-mapping      $(hexes)/hexid-fips-map.csv \
-# 	  --save-neighbors    $(hexes)/hexid-neighbors.csv \
-# 	  --save-shp          $(hexes)/hexes.shp \
-# 	  --county-polygons   $(county_polygons) \
-# 	  --cbg-polygons      $(cbg_polygons) \
-# 	  --cbg-popsize       $(cbg_popsize) \
-# 	  --fips-observations $(dp)/covidestim-observations.csv \
-# 	  --hexsize           25
+	  --save-mapping      $(hexes)/hexid-fips-map.csv \
+	  --save-neighbors    $(hexes)/hexid-neighbors.csv \
+	  --save-shp          $(hexes)/hexes.shp \
+	  --save-geojson      $(hexes)/hexes.geojson \
+	  --county-polygons   $(county_polygons) \
+	  --cbg-polygons      $(cbg_polygons) \
+	  --cbg-popsize       $(cbg_popsize) \
+	  --hexsize           25
 
 # Fit the mixed-effects model to the data, and write the estimates of the 
 # \alpha coefficients to disk

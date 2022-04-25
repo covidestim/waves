@@ -11,13 +11,15 @@ library(readr, warn.conflicts = F)
 'Waves project: US hex-grid generator
 
 Usage:
-  hexbin.R --save-mapping <path> --save-shp <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>]
+  hexbin.R --save-mapping <path> [--save-shp <path>] [--save-geojson <path>] --save-neighbors <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>]
   hexbin.R (-h | --help)
   hexbin.R --version
 
 Options:
   --save-mapping <path>     Where to save CSV of [hexid,fips,proportion1,proportion2]
+  --save-neighbors <path>   Where to save CSV of [i,j] neighbors
   --save-shp <path>         Where to save SHP of hexes, with fields [hexid]
+  --save-geojson <path>     Where to save GeoJSON of hexes, with fields [hexid]
   --county-polygons <path>  Path to TopoJSON of EPSG4326 county boundaries
   --cbg-polygons <path>     Path to TIGER SHP of CBG polygons
   --cbg-popsize <path>      Path to CSV of CBG popsize estimates, [GEOID,population]
@@ -97,11 +99,32 @@ pd()
 cli_alert_info("{.val {nrow(hexgrid)}} hexes created")
 
 # Since we'll need the hexes for graphing later on, save them to a shapefile
-#
-# TODO: export to TopoJSON (plays nicer with Observable and may actually save
-# lots of space because every edge is used twice.
-ps("Writing hexgrid shapefile to {.file {args$save_shp}}")
-st_write(hexgrid, args$save_shp, append = F) # Forces overwrite
+if (!is.null(args$save_shp)) {
+  ps("Writing hexgrid shapefile to {.file {args$save_shp}}")
+  st_write(hexgrid, args$save_shp, append = F) # Forces overwrite
+  pd()
+}
+
+# Can also save GeoJSON if user specifies. Better for Observable/d3
+if (!is.null(args$save_geojson)) {
+  ps("Writing hexgrid GeoJSON to {.file {args$save_geojson}}")
+  geojson_write(hexgrid, geometry = "polygon", file = args$save_geojson)
+  pd()
+}
+
+### st_touches returns a list of neighbors for each hex 
+### neighbors are defined as adjacent but not overlapping polygons
+ps("Creating neighbors dataframe")
+neighbors<- as.data.frame(st_touches(hexgrid))
+colnames(neighbors) <- c("i", "j") # These column names are consistent 
+                                   # with V1 with county polygons
+pd()
+
+cli_alert_info("{.val {nrow(neighbors)/2}} unique neighbor-pairs identified")
+
+### Write this dataframe to a csv file --save-neighbors <path>
+ps("Writing hex neighbors to {.file {args$save_neighbors}}")
+write_csv(neighbors, args$save_neighbors)
 pd()
 
 # Join the CBG population data to the CBG polygons. This results in a loss of
