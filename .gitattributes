@@ -1,3 +1,5 @@
 cbg-polygons/ filter=lfs diff=lfs merge=lfs -text
 cbg_popsize.csv filter=lfs diff=lfs merge=lfs -text
 cbg-polygons/* filter=lfs diff=lfs merge=lfs -text
+data-sources/cbg-polygons/* filter=lfs diff=lfs merge=lfs -text
+data-sources/cbg_popsize.csv filter=lfs diff=lfs merge=lfs -text
