@@ -107,6 +107,14 @@ $(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp $(hexes)/hexes.geojson $(hexes)/h
 	  --cbg-popsize       $(cbg_popsize) \
 	  --hexsize           25
 
+$(hexes)/hexid-observations.csv: $(hexes)/hexid-fips-map.csv $(dp)/covidestim-observations.csv
+	Rscript scripts/hex-interpolate.R \
+	  --save-observations $@ \
+	  --save-excluded     $(hexes)/hexid-excluded.csv \
+	  --hex-mapping       $(hexes)/hexid-fips-map.csv \
+	  --observations      $(dp)/covidestim-observations.csv \
+	  --exclude-threshold 20
+
 # Fit the mixed-effects model to the data, and write the estimates of the 
 # \alpha coefficients to disk
 $(hexes)/mixedmodel/alphas.csv: scripts/regression.jl \
