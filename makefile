@@ -11,6 +11,8 @@ cbg_popsize     := $(ds)/cbg_popsize.csv
 clean:
 	@rm -rf data-products/*
 
+all: counties hexes
+
 counties: $(counties)/observable/network-processed.csv
 
 hexes: $(hexes)/observable/network-processed.csv
@@ -18,14 +20,6 @@ hexes: $(hexes)/observable/network-processed.csv
 ##############################################################################
 ## Recipes common to both the county and hex versions of the analysis       ##
 ##############################################################################
-
-all: counties hexes
-
-counties: $(counties)/observable/network-processed.csv
-
-# Reads the hex shapefile created in hexbin.R and creates neighbors dataframe
-neighbors_hex.csv: scripts/neighbors.R hexes.shp
-	Rscript scripts/neighbors.R -o $@ --hex-polygons hexes.shp
 
 # Pull model results and case counts from the API, but only the important
 # variables, and cut off the last ~1.5 months
@@ -109,6 +103,10 @@ $(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp &: scripts/hexbin.R $(hex_geo_dep
 	  --cbg-polygons    $(cbg_polygons) \
 	  --cbg-popsize     $(cbg_popsize) \
 	  --hexsize         25
+
+# Reads the hex shapefile created in hexbin.R and creates neighbors dataframe
+$(hexes)/hexid-neighbors.csv: scripts/neighbors.R $(hexes)/hexes.shp
+	Rscript scripts/neighbors.R -o $@ --hex-polygons $(hexes)/hexes.shp
 
 # The below version adds support for the as-yet-unimplemented --save-neighbors
 #   option, which saves a CSV detailing each hexagon's neighboring hexagons.
