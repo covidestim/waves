@@ -46,10 +46,10 @@ args <- docopt(doc, version = 'hexbin.R 0.1')
 ps("Loading county polygons from {.file {args$county_polygons}}, then reprojecting")
 # counties_raw <- topojson_read(args$county_polygons, layer = "counties", crs = st_crs(4326)) %>%
 counties_raw <- topojson_read(args$county_polygons, layer = "counties") %>%
-  st_make_valid() 
+  st_make_valid()
 # missing geometries cause hexgrid() to fail below; check for NA and print
 # the number of counties removed.
-counties_na <- counties_raw %>%  tidyr::drop_na()  
+counties_na <- counties_raw %>% tidyr::drop_na()  
 if (dim(counties_raw)[1] > dim(counties_na)[1]) {
   diff_dim <- dim(counties_raw)[1] - dim(counties_na)[1]
   cli_progress_step(paste(diff_dim, " county(ies) dropped due to missing geometry."))
@@ -76,11 +76,10 @@ cli_alert_info("Hexsize will be ~{.val {hexsize}}mi")
 
 # Crude formula to try and make the grid size change-able in a meaningful
 # way.
-# TODO: Deserves additional scrutiny.
 miles_to_degrees <- function(miles) {
-  earth_radius <- 3960
+  earth_diameter <- 3960
   radians_to_degrees <- 180/pi
-  (miles / earth_radius) * radians_to_degrees
+  (miles / earth_diameter) * radians_to_degrees
 }
 
 ps("Creating hexgrid")
@@ -116,7 +115,7 @@ if (!is.null(args$save_geojson)) {
 ps("Creating neighbors dataframe")
 neighbors<- as.data.frame(st_touches(hexgrid))
 colnames(neighbors) <- c("i", "j") # These column names are consistent 
-                                   # with V1 with county polygons
+                                   # with county polygons' column names
 pd()
 
 cli_alert_info("{.val {nrow(neighbors)/2}} unique neighbor-pairs identified")
@@ -160,6 +159,16 @@ pd()
 # counties, and which counties are those CBGs in?
 #
 # Note that we conveniently already have the FIPS code for each CBG.
+#
+# Notes:
+#
+# - Using an inner join eliminates the possibility of having an unjoined
+#   CBG for any reason.
+#
+# - `st_nearest_feature` is used over `st_within` because it avoids issues
+#   that arise from the different spatial resolutions of the centroids and the
+#   hexgrids, where it's possible for a centroid to not be within any 
+#   hex.
 ps("Joining CBG centroids to hexgrid polygons using {.code st_nearest_feature} operator")
 cbgs_with_hexid <- 
   st_join(cbgpop_centroids, hexgrid, join = st_nearest_feature, left = F) %>%
@@ -175,8 +184,7 @@ ps("Calculating county-population using CBG data")
 fipspop_according_to_cbgs <- as_tibble(cbgpop_centroids) %>%
   select(-GEOID, -geometry) %>%
   group_by(fips) %>%
-  # Last I checked there are some NAs in the CBG-level population file
-  summarize(fipspop = sum(population, na.rm = T)) 
+  summarize(fipspop = sum(population)) 
 pd()
 cli_alert_info("U.S. population is {.val {sum(fipspop_according_to_cbgs$fipspop)}} according to CBG data")
 
@@ -193,13 +201,13 @@ cli_alert_info("U.S. population is {.val {sum(fipspop_according_to_cbgs$fipspop)
 ps("Creating hexid-FIPS mapping + proportions")
 mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %>%
   group_by(hexid) %>%
-  mutate(hexpop = sum(population, na.rm = T)) %>%
+  mutate(hexpop = sum(population)) %>%
   ungroup %>%
   filter(hexpop > 0) %>%
   group_by(hexid, fips) %>%
   summarize(
-    proportion_from_fips = sum(population, na.rm = T)/first(hexpop),
-    proportion_of_fips = sum(population, na.rm = T)/first(fipspop),
+    proportion_from_fips = sum(population)/first(hexpop),
+    proportion_of_fips   = sum(population)/first(fipspop),
     .groups = 'drop'
   )
 pd()
