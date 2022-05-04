@@ -20,6 +20,11 @@ This is a repository of code related to the ongoing Waves project.
 
 - The R packages `tidyverse`, `glue`, `cli`, `lubridate`.
 
+- For exporting visualization-related files:
+  ```
+  npm install -g d3-geo-projection topojson ndjson-cli
+  ```
+
 ## `makefile` / Getting started
 
 The complete pipeline from fetching input data to producing results compatible

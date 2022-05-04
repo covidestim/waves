@@ -13,9 +13,17 @@ clean:
 
 all: counties hexes
 
-counties: $(counties)/observable/network-processed.csv
+counties_outputs := $(counties)/mixedmodel/alphas-reformat.csv \
+		    $(counties)/observable/network-processed.csv
 
-hexes: $(hexes)/observable/network-processed.csv
+hexes_outputs := $(hexes)/mixedmodel/alphas-reformat.csv \
+		 $(hexes)/observable/network-processed.csv \
+		 $(hexes)/hexes-albers.geojson \
+		 $(hexes)/observable/network-joined.topojson.gz
+
+hexes: $(hexes_outputs)
+
+counties: $(counties_outputs)
 
 ##############################################################################
 ## Recipes common to both the county and hex versions of the analysis       ##
@@ -83,12 +91,13 @@ $(counties_infomap_outputs)&: $(counties)/infomap/network.net
 	  --multilayer-relax-rate 0.4 \
 	  /opt/data/network.net \
 	  /opt/data/ | tee $(counties)/infomap/network.log
+	@touch $(counties_infomap_outputs) # Deal with possible timestamp problem
 
 # Do some minimal processing on the `.tree` file from InfoMap to prepare it
 # for downstream use in the Observable notebook
 $(counties)/observable/network-processed.csv: $(counties)/infomap/network_states.tree
 	@mkdir -p $(counties)/observable
-	./scripts/stripForObservable.sh < $^ > $@
+	./scripts/stripForObservable.sh < $< > $@
 
 ##############################################################################
 ## Hexagonal-geography-only recipes                                         ##
@@ -107,6 +116,36 @@ $(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp $(hexes)/hexes.geojson $(hexes)/h
 	  --cbg-popsize       $(cbg_popsize) \
 	  --hexsize           25
 
+#######################################
+## Pre-Infomap Geo/TopoJSON ops      ##
+#######################################
+
+# Convert the R-generated GeoJSON of hexes to an Albers-projected GeoJSON.
+# This file does NOT account for hexes that are excluded from the dataset
+# during interpolation - so there are hexes in this GeoJSON that never actually
+# participate in the mixed-model or InfoMap steps.
+$(hexes)/hexes-albers.geojson: $(hexes)/hexes.geojson
+	geoproject "d3.geoAlbersUsa().scale(1300).translate([487.5, 305])" \
+		< $(hexes)/hexes.geojson > $@
+
+# Convert the Albers-projected GeoJSON to TopoJSON by creating hexes layer,
+# then simplifying to 1px (w.r.t. the projection), then quantizing.
+$(hexes)/hexes-albers.topojson: $(hexes)/hexes-albers.geojson
+	geo2topo hexes=$(hexes)/hexes-albers.geojson | \
+		toposimplify -p 1 - | topoquantize 1e5 - > $@
+
+# Generate a polygon composed from hexes showing their coverage.
+#
+# Note: these hexes are the set of hexes that existed pre-interpolation, so
+#   there is missingness generated downstream during interpolation that is NOT
+#   represented here.
+$(hexes)/hex-coverage-albers.topojson: $(hexes)/hexes-albers.topojson
+	topomerge hexes=hexes < $< > $@
+
+#######################################
+## Interpolation                     ##
+#######################################
+
 $(hexes)/hexid-observations.csv: $(hexes)/hexid-fips-map.csv $(dp)/covidestim-observations.csv
 	Rscript scripts/hex-interpolate.R \
 	  --save-observations $@ \
@@ -114,6 +153,10 @@ $(hexes)/hexid-observations.csv: $(hexes)/hexid-fips-map.csv $(dp)/covidestim-ob
 	  --hex-mapping       $(hexes)/hexid-fips-map.csv \
 	  --observations      $(dp)/covidestim-observations.csv \
 	  --exclude-threshold 20
+
+#######################################
+## Mixed-effects                     ##
+#######################################
 
 # Fit the mixed-effects model to the data, and write the estimates of the 
 # \alpha coefficients to disk
@@ -134,6 +177,10 @@ $(hexes)/mixedmodel/alphas-reformat.csv: scripts/transformResults.R \
 	Rscript scripts/transformResults.R \
           -o $@ \
 	  --alphas $(hexes)/mixedmodel/alphas.csv
+
+#######################################
+## Infomap                           ##
+#######################################
 
 # Prepare the machine-readable Julia fit data for the InfoMap routine by
 # transforming it into an explicitly graph-oriented representation.
@@ -165,10 +212,40 @@ $(hexes_infomap_outputs)&: $(hexes)/infomap/network.net
 	  --multilayer-relax-rate 0.4 \
 	  /opt/data/network.net \
 	  /opt/data/ | tee $(hexes)/infomap/network.log
+	@touch $(hexes_infomap_outputs) # Fix possible issue w/ timestamps
 
 # Do some minimal processing on the `.tree` file from InfoMap to prepare it
 # for downstream use in the Observable notebook
 $(hexes)/observable/network-processed.csv: $(hexes)/infomap/network_states.tree
 	@mkdir -p $(hexes)/observable
-	./scripts/stripForObservable.sh < $^ > $@
+	./scripts/stripForObservableHexid.sh < $< > $@
 
+########################################
+## Observable-focused Geo/TopoJSON ops #
+########################################
+
+# Take the network, and write it to a JSON that details the module assignments
+# for each month as an array of objects inside an object that represents a hex.
+$(hexes)/observable/network-processed.json: $(hexes)/observable/network-processed.csv
+	Rscript -e "d <- readr::read_csv('$<', col_types = 'ccn'); d <- dplyr::group_by(d, hexid); d <- tidyr::nest(d, assignments = c(module, month)); jsonlite::write_json(d, '$@')"
+
+# Convert to newline-delimited JSON to enable downstream operations
+$(hexes)/observable/network-processed.ndjson: $(hexes)/observable/network-processed.json
+	ndjson-split < $< > $@
+
+# For each GeoJSON hex, join in the assignments for each month as a .properties
+# key on each GeoJSON. Assemble this into a GeoJSON FeatureCollection.
+$(hexes)/observable/network-joined.geojson: $(hexes)/observable/network-processed.ndjson $(hexes)/hexes-albers.geojson
+	ndjson-split 'd.features' < $(hexes)/hexes-albers.geojson | \
+	ndjson-join 'd.properties.hexid' 'd.hexid' - $(hexes)/observable/network-processed.ndjson | \
+	ndjson-map 'd[0].properties = {assignments: d[1].assignments, hexid: d[1].hexid}, d[0]' | \
+	ndjson-reduce | \
+	ndjson-map '{type: "FeatureCollection", features: d}' > $@
+
+# Convert the GeoJSON to a TopoJSON
+$(hexes)/observable/network-joined.topojson: $(hexes)/observable/network-joined.geojson
+	geo2topo hexes=$< | toposimplify -p 1 - | topoquantize 1e5 - > $@
+
+# Gzip of the TopoJSON
+$(hexes)/observable/network-joined.topojson.gz: $(hexes)/observable/network-joined.topojson
+	gzip -c < $< > $@
