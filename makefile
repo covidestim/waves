@@ -66,7 +66,8 @@ $(counties)/mixedmodel/alphas-reformat.csv: scripts/transformResults.R \
                                             $(counties)/mixedmodel/alphas.csv
 	Rscript scripts/transformResults.R \
 	  -o $@ \
-	  --alphas $(counties)/mixedmodel/alphas.csv
+	  --alphas $(counties)/mixedmodel/alphas.csv \
+	  --abs # Take the absolute value of the alphas column
 
 # Prepare the machine-readable Julia fit data for the InfoMap routine by
 # transforming it into an explicitly graph-oriented representation
@@ -183,8 +184,9 @@ $(hexes)/mixedmodel/alphas.csv: scripts/regression.jl \
 $(hexes)/mixedmodel/alphas-reformat.csv: scripts/transformResults.R \
 	                                 $(hexes)/mixedmodel/alphas.csv
 	Rscript scripts/transformResults.R \
-          -o $@ \
-	  --alphas $(hexes)/mixedmodel/alphas.csv
+	  -o $@ \
+	  --alphas $(hexes)/mixedmodel/alphas.csv \
+	  --abs # Take the absolute value of the alphas column
 
 #######################################
 ## Infomap                           ##
