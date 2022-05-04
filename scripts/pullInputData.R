@@ -38,18 +38,30 @@ d1 <- read_csv(
 cli_process_done()
 
 cli_process_start("Pulling {.val {args$rundate}} results from API")
-d2 <- read_csv(
-  url(
-    glue('https://api.covidestim.org/results?"run.date"=eq.{args$rundate}&select=fips,date,Rt,infections'),
-    headers = c("Accept" = "text/csv")
-  ),
-  col_types = cols(
-    fips = col_character(),
-    date = col_date(),
-    Rt = col_number(),
-    infections = col_number()
+d2 <- local({
+  endpoint <- "https://api.covidestim.org/results"
+  outcomes <- c("fips", "date", "Rt", "infections", "infectionsPC")
+
+  query <- glue(
+    '"run.date"=eq.{rundate}&select={cols}',
+    rundate = args$rundate,
+    cols = paste(outcomes, collapse = ',')
   )
-)
+
+  read_csv(
+    url(
+      glue('{endpoint}?{query}'),
+      headers = c("Accept" = "text/csv")
+    ),
+    col_types = cols(
+      fips         = col_character(),
+      date         = col_date(),
+      Rt           = col_number(),
+      infections   = col_number(),
+      infectionsPC = col_number()
+    )
+  )
+})
 cli_process_done()
 
 maxDate <- (max(d1$date) - months(as.numeric(args$clip_final_month))) %>% floor_date(unit = 'month')

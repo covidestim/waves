@@ -41,11 +41,12 @@ println("Reading ", args["--observations"])
 results = CSV.read(
   args["--observations"], DataFrame;
   types=Dict(
-    geosym      => String,
-    :date       => Date,
-    :cases      => Float64,
-    :Rt         => Float64,
-    :infections => Float64
+    geosym        => String,
+    :date         => Date,
+    :cases        => Float64,
+    :Rt           => Float64,
+    :infections   => Float64,
+    :infectionsPC => Float64
   )
 )
 
