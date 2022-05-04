@@ -93,7 +93,7 @@ hexgrid <- st_make_grid(
   # I.e. the hexes in the Pacific Ocean etc (b/c Hawaii)
   st_filter(counties, .predicate = st_intersects) %>%
   # Assign serial ID to each hex.
-  mutate(hexid = 1:n())
+  mutate(hexid = as.character(1:n()))
 pd()
 
 # Since we'll need the hexes for graphing later on, save them to a shapefile
