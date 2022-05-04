@@ -1,3 +1,6 @@
+# Delete files made by recipes which error
+.DELETE_ON_ERROR:
+
 ds := data-sources
 dp := data-products
 
@@ -12,6 +15,8 @@ clean:
 	@rm -rf data-products/*
 
 all: counties hexes
+
+.PHONY: counties hexes all
 
 counties_outputs := $(counties)/mixedmodel/alphas-reformat.csv \
 		    $(counties)/observable/network-processed.csv
@@ -85,13 +90,12 @@ counties_infomap_outputs := $(counties)/infomap/network.tree \
 
 $(counties_infomap_outputs)&: $(counties)/infomap/network.net
 	@rm -f $(counties)/infomap/{network.tree,network_states.tree,network.log}
-	docker run -it --rm \
+	docker run --rm \
 	  -v $(shell pwd)/$(counties)/infomap/:/opt/data/ \
 	  mapequation/infomap:latest \
 	  --multilayer-relax-rate 0.4 \
 	  /opt/data/network.net \
 	  /opt/data/ | tee $(counties)/infomap/network.log
-	@touch $(counties_infomap_outputs) # Deal with possible timestamp problem
 
 # Do some minimal processing on the `.tree` file from InfoMap to prepare it
 # for downstream use in the Observable notebook
@@ -206,13 +210,12 @@ hexes_infomap_outputs := $(hexes)/infomap/network.tree \
 
 $(hexes_infomap_outputs)&: $(hexes)/infomap/network.net
 	@rm -f $(hexes)/infomap/{network.tree,network_states.tree,network.log}
-	docker run -it --rm \
+	docker run --rm \
 	  -v $(shell pwd)/$(hexes)/infomap/:/opt/data/ \
 	  mapequation/infomap:latest \
 	  --multilayer-relax-rate 0.4 \
 	  /opt/data/network.net \
 	  /opt/data/ | tee $(hexes)/infomap/network.log
-	@touch $(hexes_infomap_outputs) # Fix possible issue w/ timestamps
 
 # Do some minimal processing on the `.tree` file from InfoMap to prepare it
 # for downstream use in the Observable notebook
