@@ -10,17 +10,18 @@ using DocOpt;
 doc = """Waves project: mixed-model
 
 Usage:
-  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path>
+  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--predict-using <outcome>]
   regression.jl (-h | --help)
   regression.jl --version
 
 Options:
-  -o <path>              Where to save the interaction terms and their intercepts
-  --key <colname>        Key to group on ("fips" or "hexid")
-  --neighbors <path>     Path to a CSV listing all neighbors [i, j]
-  --observations <path>  Path to observations for each FIPS or hexid
-  -h --help              Show this screen.
-  --version              Show version.
+  -o <path>                  Where to save the interaction terms and their intercepts
+  --key <colname>            Key to group on ("fips" or "hexid")
+  --neighbors <path>         Path to a CSV listing all neighbors [i, j]
+  --observations <path>      Path to observations for each FIPS or hexid
+  --predict-using <outcome>  Which outcome to predict infections from [default: cases]
+  -h --help                  Show this screen.
+  --version                  Show version.
 
 """
 
