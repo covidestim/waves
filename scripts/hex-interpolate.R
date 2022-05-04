@@ -56,6 +56,7 @@ n_hexes_at_start <- length(unique(mapping$hexid))
 
 counties_present_in_covidestim <- unique(observations$fips)
 counties_present_in_mapping    <- unique(mapping$fips)
+hexids_present                 <- unique(mapping$hexid)
 
 counties_present <- union(
   counties_present_in_covidestim,
@@ -155,7 +156,7 @@ print(
 ultimately_excluded_fips <-
   setdiff(counties_present, ultimately_included_fips)
 ultimately_excluded_hexids <-
-  setdiff(unique(mapping$fips), ultimately_included_hexids)
+  setdiff(hexids_present, ultimately_included_hexids)
 
 if (!is.null(args$save_excluded)) {
   ps("Saving excluded fips+hexids report to {.file {args$save_excluded}}")
