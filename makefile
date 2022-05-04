@@ -53,10 +53,12 @@ $(counties)/mixedmodel/alphas.csv: scripts/regression.jl \
                                    $(dp)/covidestim-observations.csv
 	@mkdir -p $(counties)/mixedmodel
 	julia scripts/regression.jl \
-	  -o             $@ \
-	  --key          fips \
-	  --neighbors    $(ds)/fips-neighbors.csv \
-	  --observations $(dp)/covidestim-observations.csv | \
+	  -o              $@ \
+	  --key           fips \
+	  --neighbors     $(ds)/fips-neighbors.csv \
+	  --observations  $(dp)/covidestim-observations.csv \
+	  --predict       infectionsPC \
+	  --predict-using infectionsPC | \
 	tee $(counties)/mixedmodel/julia.log
 
 # Reformat the Julia output to make it more machine-readable
@@ -150,7 +152,7 @@ $(hexes)/hex-coverage-albers.topojson: $(hexes)/hexes-albers.topojson
 ## Interpolation                     ##
 #######################################
 
-$(hexes)/hexid-observations.csv: $(hexes)/hexid-fips-map.csv $(dp)/covidestim-observations.csv
+$(hexes)/hexid-observations.csv: scripts/hex-interpolate.R $(hexes)/hexid-fips-map.csv $(dp)/covidestim-observations.csv
 	Rscript scripts/hex-interpolate.R \
 	  --save-observations $@ \
 	  --save-excluded     $(hexes)/hexid-excluded.csv \
@@ -169,10 +171,12 @@ $(hexes)/mixedmodel/alphas.csv: scripts/regression.jl \
 				$(hexes)/hexid-observations.csv
 	@mkdir -p $(hexes)/mixedmodel
 	julia scripts/regression.jl \
-	  -o             $@ \
-	  --key          hexid \
-	  --neighbors    $(hexes)/hexid-neighbors.csv \
-	  --observations $(hexes)/hexid-observations.csv | \
+	  -o              $@ \
+	  --key           hexid \
+	  --neighbors     $(hexes)/hexid-neighbors.csv \
+	  --observations  $(hexes)/hexid-observations.csv \
+	  --predict       infectionsPC \
+	  --predict-using infectionsPC | \
 	  tee $(hexes)/mixedmodel/julia.log
 
 # Reformat the Julia output to make it more machine-readable

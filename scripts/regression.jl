@@ -10,7 +10,7 @@ using DocOpt;
 doc = """Waves project: mixed-model
 
 Usage:
-  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--predict-using <outcome>]
+  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--predict <outcome>] [--predict-using <outcome>]
   regression.jl (-h | --help)
   regression.jl --version
 
@@ -19,6 +19,7 @@ Options:
   --key <colname>            Key to group on ("fips" or "hexid")
   --neighbors <path>         Path to a CSV listing all neighbors [i, j]
   --observations <path>      Path to observations for each FIPS or hexid
+  --predict <outcome>        Which outcome to predict [default: cases]
   --predict-using <outcome>  Which outcome to predict infections from [default: cases]
   -h --help                  Show this screen.
   --version                  Show version.
@@ -64,12 +65,15 @@ joined = innerjoin(
 
 sort!(joined, :date)
 
+outcome_i_symbol = Symbol(args["--predict"] * "_i")
+outcome_j_symbol = Symbol(args["--predict-using"] * "_j")
+
 joined = groupby(joined, [:i, :j])
-transform!(joined, :cases_i => (v -> lag(v, 1)) => :cases_i_1)
+transform!(joined, outcome_i_symbol => (v -> lag(v, 1)) => :outcome_i_1)
 
 function lagsForVariable(df, variable, lags)
   transformers = map(
-    x -> variable => (v -> lag(v, x)) => Symbol(string(variable)*"_"*string(x)),
+    x -> variable => (v -> lag(v, x)) => Symbol("outcome_j_" * string(x)),
     lags
   )
 
@@ -77,10 +81,12 @@ function lagsForVariable(df, variable, lags)
 end
 
 println("Assembling all lags for each observation")
-lagsForVariable(joined, :cases_j, 1:20)
+lags = [1, 7, 14, 21]
+lagsForVariable(joined, outcome_j_symbol, lags)
 
 # ungroup:
 joined = select(joined, All(); ungroup=true)
+rename!(joined, outcome_i_symbol => :outcome_i)
 
 filter!([:Rt_i] => rt -> rt >= 1, joined)
 
@@ -93,36 +99,20 @@ transform!(joined, [:i, :j, :date] =>
 
 println("Fitting mixed model")
 model = fit(MixedModel, @formula(
-  infections_i ~
+  outcome_i ~
     0 + 
 
     # Interaction term (random effect)
     (1 | interactionTerm) +
 
     # Lags (fixed effects)
-    cases_j_1 +
-    cases_j_2 +
-    cases_j_3 +
-    cases_j_4 +
-    cases_j_5 +
-    cases_j_6 +
-    cases_j_7 +
-    cases_j_8 +
-    cases_j_9 +
-    cases_j_10 +
-    cases_j_11 +
-    cases_j_12 +
-    cases_j_13 +
-    cases_j_14 +
-    cases_j_15 +
-    cases_j_16 +
-    cases_j_17 +
-    cases_j_18 +
-    cases_j_19 +
-    cases_j_20 +
+    outcome_j_1 +
+    outcome_j_7 +
+    outcome_j_14 +
+    outcome_j_21 +
 
     # Autocorr (fixed effect)
-    cases_i_1
+    outcome_i_1
 
     # (EMPTY) covariates
 
