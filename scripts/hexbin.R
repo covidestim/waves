@@ -1,17 +1,17 @@
 suppressPackageStartupMessages( library(sf) )
 suppressPackageStartupMessages( library(geojsonio) )
 library(magrittr, warn.conflicts = F)
-library(ggplot2, warn.conflicts = F)
-library(dplyr, warn.conflicts = F)
-library(stringr, warn.conflicts = F)
-library(docopt, warn.conflicts = F)
-library(cli, warn.conflicts = F)
-library(readr, warn.conflicts = F)
+library(ggplot2,  warn.conflicts = F)
+library(dplyr,    warn.conflicts = F)
+library(stringr,  warn.conflicts = F)
+library(docopt,   warn.conflicts = F)
+library(cli,      warn.conflicts = F)
+library(readr,    warn.conflicts = F)
 
 'Waves project: US hex-grid generator
 
 Usage:
-  hexbin.R --save-mapping <path> [--save-shp <path>] [--save-geojson <path>] --save-neighbors <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>]
+  hexbin.R --save-mapping <path> [--save-shp <path>] [--save-geojson <path>] --save-neighbors <path> --county-polygons <path> --cbg-polygons <path> --cbg-popsize <path> [--hexsize <num>] [--lower-48]
   hexbin.R (-h | --help)
   hexbin.R --version
 
@@ -24,6 +24,7 @@ Options:
   --cbg-polygons <path>     Path to TIGER SHP of CBG polygons
   --cbg-popsize <path>      Path to CSV of CBG popsize estimates, [GEOID,population]
   --hexsize <num>           Width of each hex, unit: mi, [default: 20]
+  --lower-48                Restrict binning to lower 48 states
   -h --help                 Show this screen.
   --version                 Show version.
 
@@ -44,9 +45,9 @@ args <- docopt(doc, version = 'hexbin.R 0.1')
 # reassign the result of this call in order to avoid a stale reference to the
 # unrepaired data (or at least I think that's what's going on.
 ps("Loading county polygons from {.file {args$county_polygons}}, then reprojecting")
-# counties_raw <- topojson_read(args$county_polygons, layer = "counties", crs = st_crs(4326)) %>%
 counties_raw <- topojson_read(args$county_polygons, layer = "counties") %>%
   st_make_valid()
+
 # missing geometries cause hexgrid() to fail below; check for NA and print
 # the number of counties removed.
 counties_na <- counties_raw %>% tidyr::drop_na()  
@@ -59,6 +60,20 @@ st_crs(counties_na) <- 4326 # This TopoJSON doesn't encode the CRS maybe
 counties <- st_make_valid(counties_na)
 rm(counties_raw); rm(counties_na)
 pd()
+
+if (identical(args$lower_48, T)) {
+  cli_alert_warning("Removing all county polygons which fall outside the lower-48 states")
+
+  # Source: https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard_state_code
+  excludes = c(
+    "02", "60", "03", "81", "07", "64",
+    "14", "66", "84", "86", "67", "89",
+    "68", "71", "76", "69", "70", "95",
+    "43", "72", "74", "79"
+  )
+
+  counties <- filter(counties, !str_sub(id, 1, 2) %in% excludes)
+}
 
 ps("Loading CBG polygons from {.file {args$cbg_polygons}}")
 cbgs <- read_sf(args$cbg_polygons)
@@ -141,7 +156,6 @@ pd()
 # needlessly complicated.
 ps("Joining population data to CBG polygons and calculating CBG centroids")
 cbgpop_centroids <- mutate(cbg_popsize, GEOID = str_sub(GEOID, 8, 19)) %>%
-  filter(!is.na(population)) %>%
   inner_join(cbgs, by = 'GEOID') %>%
   transmute(
     GEOID,
@@ -184,7 +198,7 @@ ps("Calculating county-population using CBG data")
 fipspop_according_to_cbgs <- as_tibble(cbgpop_centroids) %>%
   select(-GEOID, -geometry) %>%
   group_by(fips) %>%
-  summarize(fipspop = sum(population)) 
+  summarize(fipspop = sum(population, na.rm = T)) 
 pd()
 cli_alert_info("U.S. population is {.val {sum(fipspop_according_to_cbgs$fipspop)}} according to CBG data")
 
@@ -201,13 +215,28 @@ cli_alert_info("U.S. population is {.val {sum(fipspop_according_to_cbgs$fipspop)
 ps("Creating hexid-FIPS mapping + proportions")
 mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %>%
   group_by(hexid) %>%
-  mutate(hexpop = sum(population)) %>%
+  mutate(
+    hexpop = sum(population, na.rm = T),
+    n_fips_involved = length(unique(fips))
+  ) %>%
   ungroup %>%
-  filter(hexpop > 0) %>%
   group_by(hexid, fips) %>%
   summarize(
-    proportion_from_fips = sum(population)/first(hexpop),
-    proportion_of_fips   = sum(population)/first(fipspop),
+    # If we don't know hex's population, then assume that an equal number of
+    # people from each intersecting FIPS make up the population of the hex.
+    proportion_from_fips = ifelse(
+      first(hexpop) == 0,
+      1/first(n_fips_involved),
+      sum(population, na.rm = T)/first(hexpop)
+    ),
+    # If we don't know the fips population, then we can't calculate what
+    # percentage of this FIPS's population comes from this hex, so assign it
+    # 0.
+    proportion_of_fips = ifelse(
+      first(fipspop) == 0,
+      0,
+      sum(population, na.rm = T)/first(fipspop)
+    ),
     .groups = 'drop'
   )
 pd()
@@ -217,15 +246,3 @@ cli_alert_info("{.val {length(unique(mapping$hexid))}} hexes in the mapping")
 ps("Creating hexid-FIPS mapping + proportions to {.file {args$save_mapping}}")
 write_csv(mapping, args$save_mapping)
 pd()
-
-# TODO:
-#
-# - Write a script to do the interpolation. Best to have as a separate script
-#   to avoid paying the cost of generating the mapping over and over.
-#
-# - Verify that the mapping is good
-#
-# - Make some plots of the mapping and see if we like the hexsize, etc.
-#
-# - There are a small number of NAs in the output. Why is that and what should
-#   we do about it?

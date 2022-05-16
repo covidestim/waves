@@ -120,19 +120,20 @@ $(hexes)/hexid-fips-map.csv $(hexes)/hexes.shp $(hexes)/hexes.geojson $(hexes)/h
 	  --county-polygons   $(county_polygons) \
 	  --cbg-polygons      $(cbg_polygons) \
 	  --cbg-popsize       $(cbg_popsize) \
-	  --hexsize           25
+	  --hexsize           25 \
+	  --lower-48
 
 #######################################
 ## Pre-Infomap Geo/TopoJSON ops      ##
 #######################################
 
 # Convert the R-generated GeoJSON of hexes to an Albers-projected GeoJSON.
-# This file does NOT account for hexes that are excluded from the dataset
-# during interpolation - so there are hexes in this GeoJSON that never actually
-# participate in the mixed-model or InfoMap steps.
-$(hexes)/hexes-albers.geojson: $(hexes)/hexes.geojson
+# This file DOES account for hexes that are excluded from the dataset during
+# interpolation - all hexes in this GeoJSON actually participate in the
+# mixed-model or InfoMap steps.
+$(hexes)/hexes-albers.geojson: $(hexes)/hexes-participating.geojson
 	geoproject "d3.geoAlbersUsa().scale(1300).translate([487.5, 305])" \
-		< $(hexes)/hexes.geojson > $@
+		< $(hexes)/hexes-participating.geojson > $@
 
 # Convert the Albers-projected GeoJSON to TopoJSON by creating hexes layer,
 # then simplifying to 1px (w.r.t. the projection), then quantizing.
@@ -152,13 +153,22 @@ $(hexes)/hex-coverage-albers.topojson: $(hexes)/hexes-albers.topojson
 ## Interpolation                     ##
 #######################################
 
-$(hexes)/hexid-observations.csv: scripts/hex-interpolate.R $(hexes)/hexid-fips-map.csv $(dp)/covidestim-observations.csv
+interpolation_products := $(hexes)/hexid-observations.csv \
+			  $(hexes)/hexes-participating.geojson
+
+interpolation_inputs := $(hexes)/hexid-fips-map.csv \
+			$(dp)/covidestim-observations.csv \
+			$(hexes)/hexes.geojson
+
+$(interpolation_products)&: scripts/hex-interpolate.R $(interpolation_inputs)
 	Rscript scripts/hex-interpolate.R \
-	  --save-observations $@ \
+	  --save-observations $(hexes)/hexid-observations.csv \
 	  --save-excluded     $(hexes)/hexid-excluded.csv \
+	  --save-geojson      $(hexes)/hexes-participating.geojson \
 	  --hex-mapping       $(hexes)/hexid-fips-map.csv \
 	  --observations      $(dp)/covidestim-observations.csv \
-	  --exclude-threshold 20
+	  --exclude-threshold 50 \
+	  --geojson           $(hexes)/hexes.geojson
 
 #######################################
 ## Mixed-effects                     ##
