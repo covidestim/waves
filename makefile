@@ -24,7 +24,8 @@ counties_outputs := $(counties)/mixedmodel/alphas-reformat.csv \
 hexes_outputs := $(hexes)/mixedmodel/alphas-reformat.csv \
 		 $(hexes)/observable/network-processed.csv \
 		 $(hexes)/hexes-albers.topojson \
-		 $(hexes)/observable/network-joined.topojson.gz
+		 $(hexes)/observable/network-joined.topojson.gz \
+		 $(hexes)/vectors/vectors.geojson
 
 hexes: $(hexes_outputs)
 
@@ -197,6 +198,22 @@ $(hexes)/mixedmodel/alphas-reformat.csv: scripts/transformResults.R \
 	Rscript scripts/transformResults.R \
           -o $@ \
 	  --alphas $(hexes)/mixedmodel/alphas.csv
+
+#######################################
+## Vector-field                      ##
+#######################################
+
+$(hexes)/vectors/vectors.geojson: $(hexes)/hexid-neighbors.csv \
+				  $(hexes)/mixedmodel/alphas-reformat.csv \
+				  $(hexes)/hexes.geojson \
+				  scripts/vectorfield.R
+	@mkdir -p $(hexes)/vectors
+	@rm -f $@
+	Rscript scripts/vectorfield.R \
+	  -o          $@ \
+	  --neighbors $(hexes)/hexid-neighbors.csv \
+	  --alphas    $(hexes)/mixedmodel/alphas-reformat.csv \
+	  --geos      $(hexes)/hexes.geojson
 
 #######################################
 ## Infomap                           ##
