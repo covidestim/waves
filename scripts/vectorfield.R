@@ -94,7 +94,8 @@ vector_mean <- joined %>% as_tibble %>%
     start_coord_y = first(i_geo_y),
     end_coord_y   = first(i_geo_y) + mean(i_to_j_y),
     .groups = 'drop'
-  )
+  ) %>%
+  filter(if_all(matches('coord'), ~!is.na(.)))
 pd()
 
 ps("Creating {.code LINESTRING} features for every mean-vector")
