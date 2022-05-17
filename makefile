@@ -23,7 +23,7 @@ counties_outputs := $(counties)/mixedmodel/alphas-reformat.csv \
 
 hexes_outputs := $(hexes)/mixedmodel/alphas-reformat.csv \
 		 $(hexes)/observable/network-processed.csv \
-		 $(hexes)/hexes-albers.geojson \
+		 $(hexes)/hexes-albers.topojson \
 		 $(hexes)/observable/network-joined.topojson.gz
 
 hexes: $(hexes_outputs)
