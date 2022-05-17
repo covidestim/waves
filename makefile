@@ -57,6 +57,7 @@ $(counties)/mixedmodel/alphas.csv: scripts/regression.jl \
 	  --key           fips \
 	  --neighbors     $(ds)/fips-neighbors.csv \
 	  --observations  $(dp)/covidestim-observations.csv \
+	  --regardless-of-rt \
 	  --predict       infectionsPC \
 	  --predict-using infectionsPC | \
 	tee $(counties)/mixedmodel/julia.log
@@ -185,6 +186,7 @@ $(hexes)/mixedmodel/alphas.csv: scripts/regression.jl \
 	  --key           hexid \
 	  --neighbors     $(hexes)/hexid-neighbors.csv \
 	  --observations  $(hexes)/hexid-observations.csv \
+	  --regardless-of-rt \
 	  --predict       infectionsPC \
 	  --predict-using infectionsPC | \
 	  tee $(hexes)/mixedmodel/julia.log
