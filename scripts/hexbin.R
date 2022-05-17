@@ -69,7 +69,7 @@ if (identical(args$lower_48, T)) {
     "02", "60", "03", "81", "07", "64",
     "14", "66", "84", "86", "67", "89",
     "68", "71", "76", "69", "70", "95",
-    "43", "72", "74", "79"
+    "43", "72", "74", "79", "15"
   )
 
   counties <- filter(counties, !str_sub(id, 1, 2) %in% excludes)
@@ -156,7 +156,7 @@ pd()
 # needlessly complicated.
 ps("Joining population data to CBG polygons and calculating CBG centroids")
 cbgpop_centroids <- mutate(cbg_popsize, GEOID = str_sub(GEOID, 8, 19)) %>%
-  inner_join(cbgs, by = 'GEOID') %>%
+  right_join(cbgs, by = 'GEOID') %>%
   transmute(
     GEOID,
     fips = paste0(STATEFP, COUNTYFP),
@@ -183,11 +183,24 @@ pd()
 #   that arise from the different spatial resolutions of the centroids and the
 #   hexgrids, where it's possible for a centroid to not be within any 
 #   hex.
-ps("Joining CBG centroids to hexgrid polygons using {.code st_nearest_feature} operator")
-cbgs_with_hexid <- 
-  st_join(cbgpop_centroids, hexgrid, join = st_nearest_feature, left = F) %>%
-  select(GEOID, fips, population, hexid) %>%
-  as_tibble
+ps("Joining CBG centroids to hexgrid polygons using {.code st_contains} operator")
+cbgs_with_hexid <-
+  st_join(hexgrid, cbgpop_centroids, join = st_contains, left = T) %>%
+  select(fips, population, hexid)
+
+fips_for_hexes_containing_no_cbgs <-
+  filter(cbgs_with_hexid, is.na(fips)) %>%
+  mutate(geometry = st_centroid(x)) %>%
+  st_join(counties, join = st_nearest_feature, left = F) %>%
+  as_tibble %>%
+  select(hexid, fips = id)
+
+cbgs_with_hexid <- bind_rows(
+  filter(cbgs_with_hexid, is.na(fips)) %>%
+    select(-fips) %>%
+    left_join(fips_for_hexes_containing_no_cbgs, by = "hexid"),
+  filter(cbgs_with_hexid, !is.na(fips))
+) %>% as_tibble
 pd()
 
 # Calculate the population of each county by summming up the CBGs in each
@@ -213,7 +226,7 @@ cli_alert_info("U.S. population is {.val {sum(fipspop_according_to_cbgs$fipspop)
 #       which lies within the hex.
 #       => We need this to interpolate incidence observations, like raw cases
 ps("Creating hexid-FIPS mapping + proportions")
-mapping <- inner_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %>%
+mapping <- left_join(cbgs_with_hexid, fipspop_according_to_cbgs, by = 'fips') %>%
   group_by(hexid) %>%
   mutate(
     hexpop = sum(population, na.rm = T),
