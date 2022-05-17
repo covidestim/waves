@@ -109,10 +109,10 @@ model = fit(MixedModel, @formula(
     outcome_j_1 +
     outcome_j_7 +
     outcome_j_14 +
-    outcome_j_21 +
+    outcome_j_21 # +
 
     # Autocorr (fixed effect)
-    outcome_i_1
+    # outcome_i_1
 
     # (EMPTY) covariates
 
