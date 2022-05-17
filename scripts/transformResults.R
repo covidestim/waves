@@ -32,7 +32,11 @@ d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) %>%
   transmute(
     i, j,
     month = glue("{year}-{month}-01") %>% as.Date,
-    value
+    alpha = value,
+    value # backwards-compatibility, for now
   )
 
-write_csv(d1, args$o)
+d1_with_normalized <- d1 %>% group_by(i, month) %>%
+  mutate(alpha_normalized = alpha / mean(abs(alpha)))
+
+write_csv(d1_with_normalized, args$o)
