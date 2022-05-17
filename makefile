@@ -197,6 +197,22 @@ $(hexes)/mixedmodel/alphas-reformat.csv: scripts/transformResults.R \
 	  --alphas $(hexes)/mixedmodel/alphas.csv
 
 #######################################
+## Vector-field                      ##
+#######################################
+
+$(hexes)/vectors/vectors.geojson: $(hexes)/hexid-neighbors.csv \
+				  $(hexes)/mixedmodel/alphas-reformat.csv \
+				  $(hexes)/hexes.geojson \
+				  scripts/vectorfield.R
+	@mkdir -p $(hexes)/vectors
+	@rm -f $@
+	Rscript scripts/vectorfield.R \
+	  -o          $@ \
+	  --neighbors $(hexes)/hexid-neighbors.csv \
+	  --alphas    $(hexes)/mixedmodel/alphas-reformat.csv \
+	  --geos      $(hexes)/hexes.geojson
+
+#######################################
 ## Infomap                           ##
 #######################################
 

@@ -1,0 +1,112 @@
+suppressPackageStartupMessages( library(sf) )
+suppressPackageStartupMessages( library(tidyverse) )
+library(docopt)
+library(cli)
+library(glue)
+
+'Alpha vector-field generator
+
+Usage:
+  vectorfield.R -o <path> --neighbors <path> --alphas <path> --geos <path>
+  vectorfield.R (-h | --help)
+  vectorfield.R --version
+
+Options:
+  -o <path>           Where to write a GeoJSON with the vector for each [hex, month]
+  --neighbors <path>  Path to a csv [i,j] of neighbors        
+  --alphas <path>     Path to a csv [i,j,month,alpha_normalized,...]
+  --geos <path>       Path to a GeoJSON containing the polygons of all hexes
+  -h --help           Show this screen.
+  --version           Show version.
+
+' -> doc
+
+ps <- cli_process_start 
+pd <- cli_process_done 
+
+args <- docopt(doc, version = 'vectorfield.R 0.1')
+
+# Uncomment this line to capture the value of the `args` object...useful for
+# interactive work in Rstudio
+#
+# saveRDS(args, 'example-vectorfield-args.RDS')
+
+# Use this to read in a surrogate argument object for interactive work.
+#
+# args <- readRDS('example-vectorfield-args.RDS')
+
+ps("Reading {.file {args$neighbors}}")
+neighbors <- read_csv(
+  args$neighbors,
+  col_types = cols(i = col_character(), j = col_character())
+); pd()
+
+ps("Reading {.file {args$alphas}}")
+alphas <- read_csv(
+  args$alphas,
+  col_types = cols_only(
+    i = col_character(), j = col_character(),
+    month = col_date(),
+    alpha_normalized = col_number()
+  )
+); pd()
+
+ps("Reading {.file {args$geos}} and calculating centroids")
+geos <- read_sf(args$geos) %>%
+  mutate(geometry = st_centroid(geometry))
+pd()
+
+ps("Creating library of [i,j] polygons")
+# This is a tibble with columns [i, i_geo, j, j_geo].
+# `i_geo`, `j_geo` columns are of type `st_point`
+neighbors_with_associated_geos <- 
+  rename(geos, i = hexid, i_geo = geometry) %>%
+  inner_join(neighbors, by = 'i') %>%
+  inner_join(
+    # `as_tibble` drops the `sf` class; otherwise you get an error about trying
+    # to join `sf`'s together without using `st_join`
+    rename(geos, j = hexid, j_geo = geometry) %>% as_tibble,
+    by = 'j'
+  )
+pd()
+
+ps("Forming intra-geo vectors")
+from_i_to_j <- 
+  mutate(neighbors_with_associated_geos, i_to_j = j_geo - i_geo) %>%
+  select(i, j, i_to_j, i_geo)
+pd()
+
+ps("Joining alphas to neighbors library")
+joined <- inner_join(from_i_to_j, alphas, by = c("i", "j"))
+pd()
+
+ps("Computing mean vector for every {.code i,month} combination")
+vector_mean <- joined %>% as_tibble %>%
+  mutate(
+    i_geo_x  = st_coordinates(i_geo)[,"X"],
+    i_geo_y  = st_coordinates(i_geo)[,"Y"],
+    i_to_j_x = alpha_normalized * st_coordinates(i_to_j)[,"X"],
+    i_to_j_y = alpha_normalized * st_coordinates(i_to_j)[,"Y"]
+  ) %>% group_by(i, month) %>%
+  summarize(
+    start_coord_x = first(i_geo_x),
+    end_coord_x   = first(i_geo_x) + mean(i_to_j_x),
+    start_coord_y = first(i_geo_y),
+    end_coord_y   = first(i_geo_y) + mean(i_to_j_y),
+    .groups = 'drop'
+  )
+pd()
+
+ps("Creating {.code LINESTRING} features for every mean-vector")
+features_from_wkt <- vector_mean %>%
+  transmute(i, month, wkt = glue(
+    "LINESTRING({start_coord_x} {start_coord_y}, {end_coord_x} {end_coord_y})"
+  )) %>%
+  mutate(geography = st_as_sfc(wkt)) %>%
+  select(-wkt) %>%
+  st_as_sf(crs = 4326)
+pd()
+
+ps("Writing {.file {args$o}}")
+write_sf(features_from_wkt, args$o, append = F)
+pd()
