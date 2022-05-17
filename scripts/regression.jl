@@ -10,7 +10,7 @@ using DocOpt;
 doc = """Waves project: mixed-model
 
 Usage:
-  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--predict <outcome>] [--predict-using <outcome>]
+  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--regardless-of-rt] [--predict <outcome>] [--predict-using <outcome>]
   regression.jl (-h | --help)
   regression.jl --version
 
@@ -19,6 +19,7 @@ Options:
   --key <colname>            Key to group on ("fips" or "hexid")
   --neighbors <path>         Path to a CSV listing all neighbors [i, j]
   --observations <path>      Path to observations for each FIPS or hexid
+  --regardless-of-rt         Fit all observations, even if R_t < 1
   --predict <outcome>        Which outcome to predict [default: cases]
   --predict-using <outcome>  Which outcome to predict infections from [default: cases]
   -h --help                  Show this screen.
@@ -88,7 +89,9 @@ lagsForVariable(joined, outcome_j_symbol, lags)
 joined = select(joined, All(); ungroup=true)
 rename!(joined, outcome_i_symbol => :outcome_i)
 
-filter!([:Rt_i] => rt -> rt >= 1, joined)
+if !args["--regardless-of-rt"]
+  filter!([:Rt_i] => rt -> rt >= 1, joined)
+end
 
 println("Performing categorical encoding of interaction term")
 transform!(joined, [:i, :j, :date] =>
