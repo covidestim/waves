@@ -206,14 +206,16 @@ $(hexes)/mixedmodel/alphas-reformat.csv: scripts/transformResults.R \
 $(hexes)/vectors/vectors.geojson: $(hexes)/hexid-neighbors.csv \
 				  $(hexes)/mixedmodel/alphas-reformat.csv \
 				  $(hexes)/hexes.geojson \
+				  $(hexes)/hexid-observations.csv \
 				  scripts/vectorfield.R
 	@mkdir -p $(hexes)/vectors
 	@rm -f $@
 	Rscript scripts/vectorfield.R \
-	  -o          $@ \
-	  --neighbors $(hexes)/hexid-neighbors.csv \
-	  --alphas    $(hexes)/mixedmodel/alphas-reformat.csv \
-	  --geos      $(hexes)/hexes.geojson
+	  -o             $@ \
+	  --neighbors    $(hexes)/hexid-neighbors.csv \
+	  --alphas       $(hexes)/mixedmodel/alphas-reformat.csv \
+	  --geos         $(hexes)/hexes.geojson \
+	  --observations $(hexes)/hexid-observations.csv
 
 #######################################
 ## Infomap                           ##

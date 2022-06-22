@@ -7,17 +7,18 @@ library(glue)
 'Alpha vector-field generator
 
 Usage:
-  vectorfield.R -o <path> --neighbors <path> --alphas <path> --geos <path>
+  vectorfield.R -o <path> --neighbors <path> --alphas <path> --geos <path> --observations <path>
   vectorfield.R (-h | --help)
   vectorfield.R --version
 
 Options:
-  -o <path>           Where to write a GeoJSON with the vector for each [hex, month]
-  --neighbors <path>  Path to a csv [i,j] of neighbors        
-  --alphas <path>     Path to a csv [i,j,month,alpha_normalized,...]
-  --geos <path>       Path to a GeoJSON containing the polygons of all hexes
-  -h --help           Show this screen.
-  --version           Show version.
+  -o <path>              Where to write a GeoJSON with the vector for each [hex, month]
+  --neighbors <path>     Path to a csv [i,j] of neighbors        
+  --alphas <path>        Path to a csv [i,j,month,alpha_normalized,...]
+  --geos <path>          Path to a GeoJSON containing the polygons of all hexes
+  --observations <path>  Path to a csv of observations by hex
+  -h --help              Show this screen.
+  --version              Show version.
 
 ' -> doc
 
@@ -48,6 +49,19 @@ alphas <- read_csv(
     i = col_character(), j = col_character(),
     month = col_date(),
     alpha_normalized = col_number()
+  )
+); pd()
+
+ps("Reading {.file {args$observations}}")
+observations <- read_csv(
+  args$observations,
+  col_types = cols(
+    hexid = col_character(),
+    date = col_date(),
+    cases = col_number(),
+    infections = col_number(),
+    infectionsPC = col_number(),
+    Rt = col_number()
   )
 ); pd()
 
@@ -101,8 +115,10 @@ pd()
 ps("Creating {.code LINESTRING} features for every mean-vector")
 features_from_wkt <- vector_mean %>%
   transmute(i, month, wkt = glue(
+    # WKT for a line
     "LINESTRING({start_coord_x} {start_coord_y}, {end_coord_x} {end_coord_y})"
   )) %>%
+  # Create simple feature from WKT
   mutate(geography = st_as_sfc(wkt)) %>%
   select(-wkt) %>%
   st_as_sf(crs = 4326)
