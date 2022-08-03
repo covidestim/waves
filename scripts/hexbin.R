@@ -58,6 +58,9 @@ if (dim(counties_raw)[1] > dim(counties_na)[1]) {
 
 st_crs(counties_na) <- 4326 # This TopoJSON doesn't encode the CRS maybe
 counties <- st_make_valid(counties_na)
+# remove counties with empty geometries 
+# this is necessary or st_make_grid fails below
+counties <- counties[!st_is_empty(counties),]
 rm(counties_raw); rm(counties_na)
 pd()
 
