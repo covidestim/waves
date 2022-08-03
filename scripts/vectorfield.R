@@ -65,6 +65,16 @@ observations <- read_csv(
   )
 ); pd()
 
+ps("Summarizing observations by month")
+observations_monthly <- observations %>% 
+                        mutate("month" = lubridate::floor_date(date, "month"),
+                               "i" = hexid) %>% #recode hexid as i for join with vector_mean
+                        group_by(month, i) %>%
+                        summarize("infectionsPC_avg" = mean(infectionsPC)) %>%
+                        select(i, month, infectionsPC_avg)
+
+pd()
+
 ps("Reading {.file {args$geos}} and calculating centroids")
 geos <- read_sf(args$geos) %>%
   mutate(geometry = st_centroid(geometry))
@@ -112,9 +122,13 @@ vector_mean <- joined %>% as_tibble %>%
   filter(if_all(matches('coord'), ~!is.na(.)))
 pd()
 
+ps("Joining average infections per capita to mean vectors")
+joined_vector_mean <- vector_mean %>% inner_join(observations_monthly, alphas, by = c("i", "month"))
+pd()
+
 ps("Creating {.code LINESTRING} features for every mean-vector")
-features_from_wkt <- vector_mean %>%
-  transmute(i, month, wkt = glue(
+features_from_wkt <- joined_vector_mean %>%
+  transmute(i, month, infectionsPC_avg, wkt = glue(
     # WKT for a line
     "LINESTRING({start_coord_x} {start_coord_y}, {end_coord_x} {end_coord_y})"
   )) %>%
