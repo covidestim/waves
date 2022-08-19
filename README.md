@@ -18,7 +18,7 @@ This is a repository of code related to the ongoing Waves project.
 - [Docker][docker]. You may need root privileges to use Docker depending on
   your system.
 
-- The R packages `tidyverse`, `glue`, `cli`, `lubridate`.
+- The R packages `tidyverse`, `glue`, `cli`, `lubridate`, `geojsonio`.
 
 - For exporting visualization-related files:
   ```
