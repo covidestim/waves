@@ -38,31 +38,26 @@ This is a repository of code related to the ongoing Waves project.
 
 The complete pipeline from fetching input data to producing results compatible
 with the visualization code in the Observable notebooks
-([interactions][observable1], [modules][observable2]) is specified in the
+([vector field][observable0], [interactions][observable1], [modules][observable2]) is specified in the
 `makefile`. This pipeline:
 
 1. Fetches Covidestim input and results from the public Covidestim API. This
    produces a `.csv` with all the observations that will be used in the
    mixed-model.
 
+2. Interpolates the Covidestim data to a hexagonal tiling of the US in a
+   sensible manner.
+
 2. Fits a mixed model to this data in Julia.
 
-3. Transforms the interaction coefficients from the mixed-model output so that
-   they can be fed to Infomap as edge weights between adjacent geographies.
-
-4. Runs Infomap in [multilayer
-   mode](https://www.mapequation.org/infomap/#InputMultilayerIntra) (one
-   layer/month) in order to identify modules of geographies. For a detailed
-   description of what is going on here, see [this](https://www.mapequation.org/apps/multilayer-network/index.html)
-   demonstration.
-
-5. Reformats this Infomap output a little bit so that it can be used more
-   easily within the Observable environment.
+3. Transforms the interaction coefficients from the mixed-model output into a
+   vector field that can be visualized in Observable or another GIS-like
+   environment.
 
 To run the entire pipeline, after satisfying dependencies:
 
 ```bash
-make network-processed.csv alphas_reformat.csv
+make data-products/geo-hexes/vectors/vectors.geojson
 ```
 
 This will produce `network-processed.csv` and `alphas_reformat.csv`. The
@@ -70,25 +65,64 @@ schema for these two files are described below.
 
 ## Output data schema
 
-### `network-processed.csv`
+### `covidestim_observations.csv`
 
-| Variable | Type   | Description |
-|----------|--------|-------------|
-| `module` | string | The module assigned to that geographic unit for that month. Of the form `a:b:c:d`, where `a` is the highest-level module and `d` is the lowest-level module. `a`,`b`,`c`,`d` are integers. A geographic unit may sometimes not be assigned into the deepest level of the module hierarchy for a particular month, whcih means that some units are simply assigned a module of the form `a`, `a:b`, or `a:b:c`. |
-| `fips`   | string | Geographic unit designator, currently the FIPS code of a county, but could be modified to instead represent a hexbin ID |
-| `month`  | integer | Month. Currently month `1` is the first month in the dataset. **Does not correspond to month of the year.**|
+| Variable       | Type                 | Description                                                         |
+|----------------|----------------------|---------------------------------------------------------------------|
+| `fips`         | string               | FIPS code                                                           |
+| `date`         | string, `YYYY-MM-DD` | Date                                                                |
+| `cases`        | uint                 | Number of reported cases on date `date`                             |
+| `Rt`           | float                | Covidestim estimated $R_t$ on date `date`                           |
+| `infections`   | float                | Covidestim estimated infections occurring on date `date`            |
+| `infectionsPC` | float                | Covidestim estimated infections per capita occurring on date `date` |
+
+### `hexid-neighbors.csv`
+
+| Variable | Type   | Description                 |
+|----------|--------|-----------------------------|
+| `i`      | string | Hexid of one neighbor       |
+| `j`      | string | Hexid of the other neighbor |
+
+Note: for all $i,j$, $i \neq j$ there exists a $j,i$.
+
+`i`, `j` are always unsigned integers but it is recommended to parse them as
+strings.
+
+### `hexid-fips-map.csv`
+
+| Variable               | Type   | Description                                                                    |
+|------------------------|--------|--------------------------------------------------------------------------------|
+| `hexid`                | string | Hexid |
+| `fips`                 | string | FIPS code |
+| `proportion_from_fips` | float  | **Proportion of `hexid`'s population that comes from FIPS code `fips`**. Needed for interpolating rate-expressed quantities. |
+| `proportion_of_fips`   | float  | **Proportion of `fips`'s population that lies within hexagon `hexid`**. Needed for interpolating incidence observations. |
+
+### `hexid-observations.csv`
+
+| Variable       | Type                        | Description                                                                          |
+|----------------|-----------------------------|--------------------------------------------------------------------------------------|
+| `hexid`        | string                      | Hexid                                                                                |
+| `date`         | string, `YYYY-MM-DD` format | Date                                                                                 |
+| `cases`        | **float**                   | Number of reported cases on date `date`. No longer an integer, due to interpolation. |
+| `infections`   | float                       | Covidestim estimated infections occurring on date `date`.                            |
+| `infectionsPC` | float                       | Covidestim estimated infections per capita occurring on date `date`.                 |
+| `Rt`           | float                       | Covidestim estimated $R_t$ for date `date`.                                          |
 
 ### `alphas_reformat.csv`
 
-| Variable | Type                 | Description                                                                    |
-|----------|----------------------|--------------------------------------------------------------------------------|
-| `i`      | string               | Geographic unit, currently FIPS code                                           |
-| `j`      | string               | Geographic unit, currently FIPS code                                           |
-| `month`  | string, `YYYY-MM-DD` | Month for which we calculated this interaction term                            |
-| `value`  | string               | Value of the interaction term for `i,j,month` as determined by the mixed-model |
+| Variable           | Type   | Description                                                   |
+|--------------------|--------|---------------------------------------------------------------|
+| `i`                | string | Hexid                                                         |
+| `j`                | string | Hexid                                                         |
+| `month`            | string | `YYYY-MM-01` format                                           |
+| `alpha`            | float  | Value of the mixed-model interaction term for `i`-`j`-`month` |
+| `value`            | float  | Vestigial, always equal to `alpha`.                           |
+| `alpha_normalized` | float  | Normalized alpha, calculated as $\frac{\alpha_{i,j,m}}{\mathrm{mean}(|\alpha_{i,j,m}|)} \forall (i,m,j), j = $`j` |
+
 
 [julia]: https://julialang.org/downloads/
 [docker]: https://docker.com
 
+[observable0]: https://observablehq.com/@covidestim/normalized-alphas-infectionspc
 [observable1]: https://observablehq.com/d/d933941d0d76c7d4
 [observable2]: https://observablehq.com/@marcusrussi/infomap-v2
