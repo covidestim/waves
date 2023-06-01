@@ -36,7 +36,7 @@ d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) %>%
     value # backwards-compatibility, for now
   )
 
-d1_with_normalized <- d1 %>% group_by(i, month) %>%
+d1_with_normalized <- d1 %>% group_by(j, month) %>%
   mutate(alpha_normalized = alpha / mean(abs(alpha)))
 
 write_csv(d1_with_normalized, args$o)
