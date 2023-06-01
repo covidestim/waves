@@ -117,7 +117,7 @@ strings.
 | `month`            | string | `YYYY-MM-01` format                                           |
 | `alpha`            | float  | Value of the mixed-model interaction term for `i`-`j`-`month` |
 | `value`            | float  | Vestigial, always equal to `alpha`.                           |
-| `alpha_normalized` | float  | Normalized alpha, calculated as $\frac{\alpha_{i,j,m}}{\mathrm{mean}(\|\alpha_{i,j,m}\|)} \forall (i,m,j), j = $`j` |
+| `alpha_normalized` | float  | Normalized alpha, calculated as $\frac{\alpha_{i,j,m}}{\mathrm{mean}(\|\alpha_{i,j,m}\|)} \forall (i,j,m), j = $`j` |
 
 
 [julia]: https://julialang.org/downloads/
