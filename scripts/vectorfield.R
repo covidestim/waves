@@ -68,10 +68,10 @@ observations <- read_csv(
 ps("Summarizing observations by month")
 observations_monthly <- observations %>% 
                         mutate("month" = lubridate::floor_date(date, "month"),
-                               "i" = hexid) %>% #recode hexid as i for join with vector_mean
-                        group_by(month, i) %>%
+                               "j" = hexid) %>% #recode hexid as j for join with vector_mean
+                        group_by(month, j) %>%
                         summarize("infectionsPC_avg" = mean(infectionsPC)) %>%
-                        select(i, month, infectionsPC_avg)
+                        select(j, month, infectionsPC_avg)
 
 pd()
 
@@ -84,51 +84,51 @@ ps("Creating library of [i,j] polygons")
 # This is a tibble with columns [i, i_geo, j, j_geo].
 # `i_geo`, `j_geo` columns are of type `st_point`
 neighbors_with_associated_geos <- 
-  rename(geos, i = hexid, i_geo = geometry) %>%
-  inner_join(neighbors, by = 'i') %>%
+  rename(geos, j = hexid, j_geo = geometry) %>%
+  inner_join(neighbors, by = 'j') %>%
   inner_join(
     # `as_tibble` drops the `sf` class; otherwise you get an error about trying
     # to join `sf`'s together without using `st_join`
-    rename(geos, j = hexid, j_geo = geometry) %>% as_tibble,
-    by = 'j'
+    rename(geos, i = hexid, i_geo = geometry) %>% as_tibble,
+    by = 'i'
   )
 pd()
 
 ps("Forming intra-geo vectors")
-from_i_to_j <- 
-  mutate(neighbors_with_associated_geos, i_to_j = j_geo - i_geo) %>%
-  select(i, j, i_to_j, i_geo)
+from_j_to_i <- 
+  mutate(neighbors_with_associated_geos, j_to_i = i_geo - j_geo) %>%
+  select(i, j, j_to_i, j_geo)
 pd()
 
 ps("Joining alphas to neighbors library")
-joined <- inner_join(from_i_to_j, alphas, by = c("i", "j"))
-pd()
+joined <- inner_join(from_j_to_i, alphas, by = c("i", "j"))
+pd()                    
 
 ps("Computing mean vector for every {.code i,month} combination")
 vector_mean <- joined %>% as_tibble %>%
   mutate(
-    i_geo_x  = st_coordinates(i_geo)[,"X"],
-    i_geo_y  = st_coordinates(i_geo)[,"Y"],
-    i_to_j_x = alpha_normalized * st_coordinates(i_to_j)[,"X"],
-    i_to_j_y = alpha_normalized * st_coordinates(i_to_j)[,"Y"]
-  ) %>% group_by(i, month) %>%
+    j_geo_x  = st_coordinates(j_geo)[,"X"],
+    j_geo_y  = st_coordinates(j_geo)[,"Y"],
+    j_to_i_x = alpha_normalized * st_coordinates(j_to_i)[,"X"],
+    j_to_i_y = alpha_normalized * st_coordinates(j_to_i)[,"Y"]
+  ) %>% group_by(j, month) %>%
   summarize(
-    start_coord_x = first(i_geo_x),
-    end_coord_x   = first(i_geo_x) + mean(i_to_j_x),
-    start_coord_y = first(i_geo_y),
-    end_coord_y   = first(i_geo_y) + mean(i_to_j_y),
+    start_coord_x = first(j_geo_x),
+    end_coord_x   = first(j_geo_x) + mean(j_to_i_x),
+    start_coord_y = first(j_geo_y),
+    end_coord_y   = first(j_geo_y) + mean(j_to_i_y),
     .groups = 'drop'
   ) %>%
   filter(if_all(matches('coord'), ~!is.na(.)))
 pd()
 
 ps("Joining average infections per capita to mean vectors")
-joined_vector_mean <- vector_mean %>% inner_join(observations_monthly, alphas, by = c("i", "month"))
+joined_vector_mean <- vector_mean %>% inner_join(observations_monthly, alphas, by = c("j", "month"))
 pd()
 
 ps("Creating {.code LINESTRING} features for every mean-vector")
 features_from_wkt <- joined_vector_mean %>%
-  transmute(i, month, infectionsPC_avg, wkt = glue(
+  transmute(j, month, infectionsPC_avg, wkt = glue(
     # WKT for a line
     "LINESTRING({start_coord_x} {start_coord_y}, {end_coord_x} {end_coord_y})"
   )) %>%
