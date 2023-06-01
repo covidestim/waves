@@ -1,6 +1,6 @@
 # Waves
 
-![Diagram of project dataflow](/img/diagram.jpg)
+![Diagram of project dataflow](/img/diagram.png)
 
 This is a repository of code related to the ongoing Waves project.
 
@@ -18,12 +18,21 @@ This is a repository of code related to the ongoing Waves project.
 - [Docker][docker]. You may need root privileges to use Docker depending on
   your system.
 
-- The R packages `sf` `tidyverse` `docopt` `cli` `glue` `geojsonio`
+- The R packages `sf` `tidyverse` `docopt` `cli` `glue` `geojsonio`. `sf` in
+  particular is a heavy package and it is common for people to experience
+  issues installing, see the [sf docs on
+  installing](https://r-spatial.github.io/sf/#installing) first.  
+  ```r
+  install.packages(c('sf', 'tidyverse', 'docopt', 'cli', 'glue', 'geojsonio'))
+  ```
 
 - For exporting visualization-related files:
   ```
   npm install -g d3-geo-projection topojson ndjson-cli
   ```
+
+- [Git LFS](https://git-lfs.com). Run `git lfs fetch && git lfs checkout` from
+  the repository root.
 
 ## `makefile` / Getting started
 
