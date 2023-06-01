@@ -56,14 +56,35 @@ with the visualization code in the Observable notebooks
 
 To run the entire pipeline, after satisfying dependencies:
 
-```bash
+```sh
 make data-products/geo-hexes/vectors/vectors.geojson
 ```
 
-This will produce `network-processed.csv` and `alphas_reformat.csv`. The
-schema for these two files are described below.
+To see what would be run by the above command:
 
-## Output data schema
+```sh
+make -B --dry-run data-products/geo-hexes/vectors/vectors.geojson
+```
+
+To visualize the results in Observable, you can start by making a clone of [this notebook](https://observablehq.com/@covidestim/normalized-alphas-infectionspc) and replacing the `vectors.geojson` file (located in the Files pane on the right sidebar as of June 2023) with the file you just produced.
+
+
+## The mixed-effects model
+
+Model design overview can be found in [this notebook](https://observablehq.com/@marcusrussi/waves-models).
+
+The current model can be summarized as follows:
+
+- All pairs of neighboring hexes are modeled
+- The interaction term is calculated for each month and directional pair
+  - I.e., [January 2021, Hexid = `1` Hexid = `2`], [January 2021, Hexid = `2` Hexid = `1`] are both modeled.
+- There are some limits on which observations are included because we don't really want to model declining epidemics.
+- The model has an intercept of `0`
+- The only terms in the model are lagged observations, the intercept, and the interaction term. There are no covariates.
+
+The statement of the model is in `scripts/regression.jl`.
+
+## Schema of key files
 
 ### `covidestim_observations.csv`
 
