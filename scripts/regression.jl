@@ -10,7 +10,7 @@ using DocOpt;
 doc = """Waves project: mixed-model
 
 Usage:
-  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--regardless-of-rt] [--predict <outcome>] [--predict-using <outcome>]
+  regression.jl -o <path> --key <colname> --neighbors <path> --observations <path> [--regardless-of-rt] [--no-autocorr] [--predict <outcome>] [--predict-using <outcome>]
   regression.jl (-h | --help)
   regression.jl --version
 
@@ -20,6 +20,7 @@ Options:
   --neighbors <path>         Path to a CSV listing all neighbors [i, j]
   --observations <path>      Path to observations for each FIPS or hexid
   --regardless-of-rt         Fit all observations, even if R_t < 1
+  --no-autocorr              Take out the autcorrelation term
   --predict <outcome>        Which outcome to predict [default: cases]
   --predict-using <outcome>  Which outcome to predict infections from [default: cases]
   -h --help                  Show this screen.
@@ -100,8 +101,10 @@ transform!(joined, [:i, :j, :date] =>
   => :interactionTerm
 )
 
-println("Fitting mixed model")
-model = fit(MixedModel, @formula(
+
+## Choosing between a autocorr term model or a without autocorr model term
+if args["--no-autocorr"]
+  formula = @formula(
   outcome_i ~
     0 + 
 
@@ -112,14 +115,42 @@ model = fit(MixedModel, @formula(
     outcome_j_1 +
     outcome_j_7 +
     outcome_j_14 +
-    outcome_j_21 # +
+    outcome_j_21 #+
 
     # Autocorr (fixed effect)
-    # outcome_i_1
+    #outcome_i_1
 
     # (EMPTY) covariates
 
-), joined, contrasts=Dict(:interactionTerm => Grouping()))
+)
+else
+  formula = @formula(
+  outcome_i ~
+    0 + 
+
+    # Interaction term (random effect)
+    (1 | interactionTerm) +
+
+    # Lags (fixed effects)
+    outcome_j_1 +
+    outcome_j_7 +
+    outcome_j_14 +
+    outcome_j_21 +
+
+    # Autocorr (fixed effect)
+    outcome_i_1
+
+    # (EMPTY) covariates
+
+)
+end
+##
+
+println("The model formula is:")
+print(formula)
+
+println("Fitting mixed model")
+model = fit(MixedModel, formula, joined, contrasts=Dict(:interactionTerm => Grouping()))
 println("Fit complete")
 
 effects = DataFrame(only(raneftables(model)))
