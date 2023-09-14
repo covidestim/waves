@@ -36,6 +36,7 @@ d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) |>
     alpha = value,
     value # backwards-compatibility, for now
   ) |> 
+  # Creating a date using the month and week parts
   mutate(date = ymd(date) + (week - week(date))*7)
 
 d1_with_normalized <- d1 |>  

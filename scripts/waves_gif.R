@@ -28,15 +28,16 @@ range_values<-pretty(features_from_wkt$infectionsPC_avg)
 #                          start_coord_y = features_from_wkt$start_coord_y,
 #                          end_coord_y = features_from_wkt$end_coord_y,
 #                          infectionsPC = features_from_wkt$infectionsPC_avg))
-# features_from_wkt |> 
-#   filter(week == week) |> 
+# features_from_wkt |>
+#   filter(week == week) |>
 #   ggplot() +
 #   geom_sf(data = us_map)+
-#   geom_sf()+
+#   geom_sf(aes(col = infectionsPC_avg))+
 #   metR::scale_color_divergent(midpoint = 400,
 #                               guide = "colorbar",
 #                               name = "average Infections per capita",
-#                               breaks = range_values)+
+#                               breaks = range_values, 
+#                               limits = c(0, 1000))+
 #   theme_dark() +
 #   # labs(title = paste("Week:", week))+
 #   theme(legend.position = "top")
@@ -45,23 +46,53 @@ range_values<-pretty(features_from_wkt$infectionsPC_avg)
 # #                                       ("start_coord_y" - "end_coord_y")), 
 # #             by = j]
 
+# define the arrow length in decimal degrees
+arrow_length <- 1
+
 plot_and_save_frame <- function(week) {
   # Filter the data for the current week
   data <- features_from_wkt[features_from_wkt$week == week, ]
   
   # Create a ggplot2 plot
-  # plot <- 
+  plot <- data |> 
     ggplot() +
     geom_sf(data = us_map)+
-    geom_contour_fill(data = data, 
-            aes(z = infectionsPC_avg)) +
-    # scale_color_viridis_c(option = "turbo",
-    #                       breaks = range_values) +
-    metR::scale_color_divergent(midpoint = 400,
-                                guide = "colorbar",
-                                name = "average Infections per capita",
-                                breaks = range_values)+
-    theme_dark() +
+    geom_sf(aes(col = infectionsPC_avg)) +
+    # extract coordinates
+    # stat_sf_coordinates() +
+    # draw arrows with orientation from attribute
+    # geom_segment(mapping = aes(geometry = geometry, 
+    #                            col = infectionsPC_avg,
+    #                            # size = infectionsPC_avg,
+    #                            x = start_coord_x, 
+    #                            y = start_coord_y, 
+    #                            xend = end_coord_x + arrow_length, 
+    #                            yend = end_coord_y + arrow_length), 
+    #              arrow = arrow(angle = 5, ends = "last", type = "open")) +
+    # # draw circle markers
+    # geom_sf(stat = "sf_coordinates", 
+    #         mapping = aes(geometry = geometry, 
+    #                       x = after_stat(x), 
+    #                       y = after_stat(y)), 
+    #         size = 4, 
+    #         shape = 21, 
+    #         fill = "white") +
+    scale_color_viridis_c(option = "turbo",
+                          # midpoint = 600, 
+                          name = "average Infections per capita",
+                          breaks = range_values,
+                          limits = c(0,400), 
+                          guide = guide_colorstrip(title.position = "top",
+                                                   barwidth = grid::unit(8, "cm"))) +
+    # metR::scale_color_divergent(midpoint = 600,
+    #                             name = "average Infections per capita",
+    #                             # breaks = range_values,
+    #                             limits = c(0,1200), 
+    #                             guide = guide_colorbar(title.position = "top",
+    #                                                    title.vjust = 1, 
+    #                                                    nbin = 10, ticks = T, 
+    #                                                    barwidth = grid::unit(8, "cm")))+
+    theme_void() +
     # labs(title = paste("Week:", week))+
     theme(legend.position = "top")
   
@@ -79,7 +110,7 @@ frame_files <- frame_files |>
 
 animation <- image_animate(image_read(frame_files), 
                            fps = 5, 
-                           delay = 1)
+                           delay = 10)
 
 animation
 # Specify the output file path
@@ -87,3 +118,4 @@ output_file <- "animation.gif"
 
 # Save the GIF animation
 image_write(animation, output_file)
+
