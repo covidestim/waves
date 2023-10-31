@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 # Waves
 
 ![Diagram of project dataflow](/img/diagram.png)
@@ -129,13 +134,25 @@ strings.
 | `infectionsPC` | float                       | Covidestim estimated infections per capita occurring on date `date`.                 |
 | `Rt`           | float                       | Covidestim estimated $R_t$ for date `date`.                                          |
 
-### `alphas_reformat.csv`
+### `alphas-reformat.csv`
 
 | Variable           | Type   | Description                                                   |
 |--------------------|--------|---------------------------------------------------------------|
 | `i`                | string | Hexid                                                         |
 | `j`                | string | Hexid                                                         |
 | `month`            | string | `YYYY-MM-01` format                                           |
+| `alpha`            | float  | Value of the mixed-model interaction term for `i`-`j`-`month` |
+| `value`            | float  | Vestigial, always equal to `alpha`.                           |
+| `alpha_normalized` | float  | Normalized alpha, calculated as $\frac{\alpha_{i,j,m}}{\mathrm{mean}(\|\alpha_{i,j,m}\|)} \forall (i,j,m), j = $`j` |
+
+### `alphas_weekly-reformat.csv`
+
+| Variable           | Type   | Description                                                   |
+|--------------------|--------|---------------------------------------------------------------|
+| `i`                | string | Hexid                                                         |
+| `j`                | string | Hexid                                                         |
+| `date`             | string | `YYYY-MM-DD` format                                           |
+| `week`             | string | week number                                                   |
 | `alpha`            | float  | Value of the mixed-model interaction term for `i`-`j`-`month` |
 | `value`            | float  | Vestigial, always equal to `alpha`.                           |
 | `alpha_normalized` | float  | Normalized alpha, calculated as $\frac{\alpha_{i,j,m}}{\mathrm{mean}(\|\alpha_{i,j,m}\|)} \forall (i,j,m), j = $`j` |

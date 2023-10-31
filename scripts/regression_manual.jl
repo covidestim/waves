@@ -74,9 +74,11 @@ lagsForVariable(joined, outcome_j_symbol, lags)
 joined = select(joined, All(); ungroup=true)
 rename!(joined, outcome_i_symbol => :outcome_i)
 
+filter([:i], => ==1, joined)
+
 ## Filtering out with R_t < 1, if the arg is set to
 # if !args["--regardless-of-rt"]
-  filter!([:Rt_i] => rt -> rt >= 1, joined)
+  #filter!([:Rt_i] => rt -> rt >= 1, joined)
 # end
 
 # Performing categorical encoding of interaction term
@@ -146,4 +148,6 @@ effects = DataFrame(only(raneftables(model)))
 # println(model)
 
 # Writing alphas .csv
-CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly.csv", effects)
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt.csv", effects)
+
+CSV.write("data-products/geo-hexes/mixedmodel/joined-weekly.csv", joined)

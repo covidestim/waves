@@ -6,9 +6,9 @@ library(sf)
 library(magick)
 library(metR)
 
-features_from_wkt <- st_read("data-products/geo-hexes/vectors/vectors_weekly.geojson")
+features_from_wkt <- st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt.geojson")
 
-weeks <- sort(unique(features_from_wkt$week))
+weeks <- sort(unique(features_from_wkt$date))
 
 us_map <- tigris::states(cb = T) |> 
   tigris::shift_geometry() |> 
@@ -19,7 +19,7 @@ ggplot()+
   geom_sf(data = us_map)+
   theme_dark()
 
-range_values<-pretty(features_from_wkt$infectionsPC_avg)
+# range_values<-pretty(features_from_wkt$infectionsPC_avg, n = 10)
 
 # test <- data.table(cbind(j = features_from_wkt$j, 
 #                          week = features_from_wkt$week, 
@@ -49,15 +49,17 @@ range_values<-pretty(features_from_wkt$infectionsPC_avg)
 # define the arrow length in decimal degrees
 arrow_length <- 1
 
+week <- weeks[1]
+
 plot_and_save_frame <- function(week) {
   # Filter the data for the current week
-  data <- features_from_wkt[features_from_wkt$week == week, ]
+  data <- features_from_wkt[features_from_wkt$date == week, ]
   
   # Create a ggplot2 plot
-  plot <- data |> 
-    ggplot() +
+  plot <- ggplot() +
     geom_sf(data = us_map)+
-    geom_sf(aes(col = infectionsPC_avg)) +
+    geom_sf(data= data, 
+            aes(col = infectionsPC_avg)) +
     # extract coordinates
     # stat_sf_coordinates() +
     # draw arrows with orientation from attribute
@@ -80,25 +82,20 @@ plot_and_save_frame <- function(week) {
     scale_color_viridis_c(option = "turbo",
                           # midpoint = 600, 
                           name = "average Infections per capita",
-                          breaks = range_values,
-                          limits = c(0,400), 
+                          breaks = seq(0,400,50), 
+                          limits = c(0,400),  
+                          oob = scales::squish,
                           guide = guide_colorstrip(title.position = "top",
-                                                   barwidth = grid::unit(8, "cm"))) +
-    # metR::scale_color_divergent(midpoint = 600,
-    #                             name = "average Infections per capita",
-    #                             # breaks = range_values,
-    #                             limits = c(0,1200), 
-    #                             guide = guide_colorbar(title.position = "top",
-    #                                                    title.vjust = 1, 
-    #                                                    nbin = 10, ticks = T, 
-    #                                                    barwidth = grid::unit(8, "cm")))+
+                                                   title.hjust = 0.5,
+                                                   barwidth = grid::unit(12, "cm"))) +
     theme_void() +
-    # labs(title = paste("Week:", week))+
+    labs(title = paste("Week:", week))+
     theme(legend.position = "top")
+  # plot
   
   # # Save the plot as a temporary file
   tmp_file <- tempfile(fileext = ".png")
-  ggsave(tmp_file, plot, width = 11, height = 9)
+  ggsave(tmp_file, plot, width = 16, height = 9)
   
   # Return the temporary file path
   return(tmp_file)
@@ -109,12 +106,12 @@ frame_files <- frame_files |>
   unlist()
 
 animation <- image_animate(image_read(frame_files), 
-                           fps = 5, 
-                           delay = 10)
+                           fps = 5)
 
 animation
+
 # Specify the output file path
-output_file <- "animation.gif"
+output_file <- "animation2.gif"
 
 # Save the GIF animation
 image_write(animation, output_file)

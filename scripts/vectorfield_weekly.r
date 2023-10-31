@@ -44,10 +44,11 @@ neighbors <- read_csv(
 
 # ps("Reading {.file {args$alphas}}")
 alphas <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly-reformat.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat.csv",
   col_types = cols_only(
     i = col_character(), j = col_character(),
     date = col_date(),
+    # week_num = col_character(),
     alpha_normalized = col_number()
   )
 ) |> 
@@ -124,6 +125,7 @@ vector_mean <- joined %>% as_tibble %>%
 # pd()
 
 # ps("Joining average infections per capita to mean vectors")
+## Verify closer the week flooring , maybe this is cutting off some dates
 joined_vector_mean <- vector_mean %>% 
   mutate(week = floor_date(week, "week")) |> 
   inner_join(observations_date |> 
@@ -141,10 +143,12 @@ features_from_wkt <- joined_vector_mean %>%
   # Create simple feature from WKT
   mutate(geography = st_as_sfc(wkt)) %>%
   select(-wkt) %>%
-  st_as_sf(crs = 4326)
+  st_as_sf(crs = 4326) |> 
+  rename(date = week)
 # pd()
 
 # ps("Writing {.file {args$o}}")
 write_sf(features_from_wkt, 
-         "data-products/geo-hexes/vectors/vectors_weekly.geojson", append = F)
+         "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt.geojson", 
+         append = F)
 # pd()

@@ -20,7 +20,7 @@ library(docopt)
 # args <- docopt(doc, version = 'transformResults_weekly.R 0.1')
 
 d <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt.csv",
   col_types = cols(
     interactionTerm = col_character(),
     `(Intercept)` = col_number()
@@ -36,12 +36,13 @@ d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) |>
     alpha = value,
     value # backwards-compatibility, for now
   ) |> 
-  # Creating a date using the month and week parts
-  mutate(date = ymd(date) + (week - week(date))*7)
+  # Creating a date using the month and week
+  mutate(date_week = ymd(date) + (week - week(date))*7)
 
 d1_with_normalized <- d1 |>  
-  group_by(j, date) |> 
+  ## Should be grouped by i, not by j
+  group_by(j, date) |>
   mutate(alpha_normalized = alpha / mean(abs(alpha)))
 
 write_csv(d1_with_normalized, 
-          "data-products/geo-hexes/mixedmodel/alphas_weekly-reformat.csv")
+          "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat.csv")
