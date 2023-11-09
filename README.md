@@ -3,7 +3,7 @@ output:
   pdf_document: default
   html_document: default
 ---
-# Waves
+# Waves test
 
 ![Diagram of project dataflow](/img/diagram.png)
 
