@@ -113,19 +113,34 @@ vector_mean <- joined %>%
   mutate(
     j_geo_x  = st_coordinates(j_geo)[,"X"],
     j_geo_y  = st_coordinates(j_geo)[,"Y"],
-    j_to_i_x = alpha_normalized * st_coordinates(j_to_i)[,"X"],
-    j_to_i_y = alpha_normalized * st_coordinates(j_to_i)[,"Y"]
-  ) %>% 
+    j_to_i_x = sqrt(2)/2 * st_coordinates(j_to_i)[,"X"],
+    j_to_i_y = sqrt(2)/2 * st_coordinates(j_to_i)[,"Y"],
+    # j_to_i_x_norm = alpha_normalized * st_coordinates(j_to_i)[,"X"],
+    # j_to_i_y_norm = alpha_normalized * st_coordinates(j_to_i)[,"Y"]
+  ) |> 
+  # mutate(start_x = j_geo_x, start_y = j_geo_y,
+  #        end_x = j_geo_x + j_to_i_x, end_y = j_geo_y + j_to_i_y) |> 
   group_by(j, date_week) %>%
   summarize(
-    start_coord_x = first(j_geo_x),
-    end_coord_x   = first(j_geo_x) + mean(j_to_i_x),
-    start_coord_y = first(j_geo_y),
-    end_coord_y   = first(j_geo_y) + mean(j_to_i_y),
+    start_coord_x = j_geo_x,
+    end_coord_x   = j_geo_x + j_to_i_x,
+    start_coord_y = j_geo_y,
+    end_coord_y   = j_geo_y + j_to_i_y,
     .groups = 'drop'
   ) %>%
   filter(if_all(matches('coord'), ~!is.na(.)))
 # pd()
+
+# ## Casting points geometry to start_coord and end_coords
+# vector_xy_start <- vector_mean |> 
+#   select(i, j, date_week, start_x = j_geo_x, start_y = j_geo_y)
+#   
+# vector_xy_end <- vector_mean |> 
+#   select(i, j, date_week, end_x = j_geo_x, j_to_i_x, end_y = j_geo_y, j_to_i_y)|> 
+#   mutate(end_x = end_x + j_to_i_x, 
+#          end_y = end_y + j_to_i_y) 
+# 
+# vector_xy <- inner_join(vector_xy_start, vector_xy_end) 
 
 # ps("Joining average infections per capita to mean vectors")
 ## Verify closer the week flooring , maybe this is cutting off some dates
@@ -144,10 +159,12 @@ features_from_wkt <- joined_vector_mean %>%
   )) %>%
   # Create simple feature from WKT
   mutate(geography = st_as_sfc(wkt)) %>%
-  select(-wkt) %>%
+  select(-wkt)  |> 
   st_as_sf(crs = 4326) |> 
   st_cast("LINESTRING")
 # pd()
+
+## Maybe we have to cast this object as LINESTRING from POINT geometry, instead of writing it manually
 
 # ps("Writing {.file {args$o}}")
 write_sf(features_from_wkt, 

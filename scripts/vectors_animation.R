@@ -1,11 +1,9 @@
 rm(list = ls())
 gc()
 
-hexes <- st_read("data-products/geo-hexes/hexes.geojson") |> 
-  st_as_sf(crs = 4326)
+hexes <- st_read("data-products/geo-hexes/hexes.geojson")
 
-features_from_wkt <- st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt.geojson") |> 
-  st_as_sf(crs = 4326)
+features_from_wkt <- st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt.geojson")
 
 ## To-do: Map the vectors with the counties and see if the centroids point to counties centroids
 
@@ -15,15 +13,15 @@ features_from_wkt <- st_read("data-products/geo-hexes/vectors/vectors_weekly_reg
 hexes_arrow <- hexes |>
   ggplot()+
   geom_sf(fill = "transparent")+
-  # geom_sf(data = features_from_wkt |>
-  #           filter(date_week == max(date_week)),
-  #         aes(color = infectionsPC_avg))+
-  geom_segment(data = features_from_wkt |>
-              filter(date_week == max(date_week)),
-            aes(x = start_coord_x, xend = end_coord_x,
-                y = start_coord_y, yend = end_coord_y,
-                color = infectionsPC_avg),
-            arrow = grid::arrow(length = grid::unit(x = 1.2, "mm")))+
+  geom_sf(data = features_from_wkt |>
+            filter(date_week == max(date_week)),
+          aes(color = infectionsPC_avg))+
+  # geom_segment(data = features_from_wkt |>
+  #             filter(date_week == max(date_week)),
+  #           aes(x = start_coord_x, xend = end_coord_x,
+  #               y = start_coord_y, yend = end_coord_y,
+  #               color = infectionsPC_avg),
+  #           arrow = grid::arrow(angle = sqrt(2)/2, length = unit(x = .1, units = "mm")))+
   theme_void()+
   scale_y_continuous(limits = c(23,50))+
   scale_x_continuous(limits = c(-130, -65))+
@@ -39,7 +37,7 @@ hexes_arrow <- hexes |>
   theme(legend.position = "top")
 hexes_arrow
 
-week <- max(features_from_wkt$date_week, na.rm = T)
+# week <- max(features_from_wkt$date_week, na.rm = T)
 
 plot_and_save_frame <- function(week) {
   # Filter the data for the current week
@@ -49,14 +47,13 @@ plot_and_save_frame <- function(week) {
   plot <- ggplot()+
     geom_sf(data = hexes, 
             fill = "transparent")+
-    # geom_sf(data = features_from_wkt |>
-    #           filter(date_week == max(date_week)),
-    #         aes(color = infectionsPC_avg))+
-    geom_segment(data = data,
-                 aes(x = start_coord_x, xend = end_coord_x,
-                     y = start_coord_y, yend = end_coord_y,
-                     color = infectionsPC_avg),
-                 arrow = grid::arrow(length = grid::unit(x = 1.2, "mm")))+
+    geom_sf(data = data,
+            aes(color = infectionsPC_avg))+
+    # geom_segment(data = data,
+    #              aes(x = start_coord_x, xend = end_coord_x,
+    #                  y = start_coord_y, yend = end_coord_y,
+    #                  color = infectionsPC_avg),
+    #              arrow = grid::arrow(length = grid::unit(x = 1.2, "mm")))+
     theme_void()+
     scale_y_continuous(limits = c(23,50))+
     scale_x_continuous(limits = c(-130, -65))+
@@ -69,9 +66,9 @@ plot_and_save_frame <- function(week) {
                           guide = metR::guide_colorstrip(title.position = "top",
                                                          title.hjust = 0.5,
                                                          barwidth = grid::unit(12, "cm")))+
-    # labs(title = paste("Week:", date_week))+
+    labs(tag = paste("Week:", week))+
     theme(legend.position = "top")
-  plot
+  # plot
   
   # # Save the plot as a temporary file
   tmp_file <- tempfile(fileext = ".png")
@@ -83,7 +80,7 @@ plot_and_save_frame <- function(week) {
 
 weeks <- unique(features_from_wkt$date_week)
 
-frame_files <- lapply(weeks[1:20], plot_and_save_frame)
+frame_files <- lapply(weeks, plot_and_save_frame)
 frame_files <- frame_files |> 
   unlist()
 
