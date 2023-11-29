@@ -109,23 +109,33 @@ joined <- inner_join(from_j_to_i, alphas, by = c("i", "j"))
 
 # ps("Computing mean vector for every {.code i,date} combination")
 vector_mean <- joined %>% 
+  # ## filtering to only show alphas >0, and the maximum value between a_ij and a_ji
+  # filter(alpha>0, alpha == max(alpha),
+  #        .by = c(j,date_week)) %>%
   as_tibble %>%
   mutate(
     j_geo_x  = st_coordinates(j_geo)[,"X"],
     j_geo_y  = st_coordinates(j_geo)[,"Y"],
-    j_to_i_x = sqrt(2)/2 * st_coordinates(j_to_i)[,"X"],
-    j_to_i_y = sqrt(2)/2 * st_coordinates(j_to_i)[,"Y"],
+    ## Try without the sqrt(2)/2, maybe this is fixing the direction
+    # j_to_i_x = sqrt(2)/2 * st_coordinates(j_to_i)[,"X"],
+    # j_to_i_y = sqrt(2)/2 * st_coordinates(j_to_i)[,"Y"],
+    ## No sqrt(2)/2
+    j_to_i_x = st_coordinates(j_to_i)[,"X"],
+    j_to_i_y = st_coordinates(j_to_i)[,"Y"],
     # j_to_i_x_norm = alpha_normalized * st_coordinates(j_to_i)[,"X"],
     # j_to_i_y_norm = alpha_normalized * st_coordinates(j_to_i)[,"Y"]
   ) |> 
   # mutate(start_x = j_geo_x, start_y = j_geo_y,
   #        end_x = j_geo_x + j_to_i_x, end_y = j_geo_y + j_to_i_y) |> 
   group_by(j, date_week) %>%
+  ## summairzes over the maximum value in any direction
   summarize(
-    start_coord_x = j_geo_x,
-    end_coord_x   = j_geo_x + j_to_i_x,
-    start_coord_y = j_geo_y,
-    end_coord_y   = j_geo_y + j_to_i_y,
+    ## Keeping alphas as cut-off measure
+    alpha = alpha,
+    start_coord_x = j_geo_x + j_to_i_x/3,
+    end_coord_x   = j_geo_x + 2*j_to_i_x/3,
+    start_coord_y = j_geo_y + j_to_i_y/3,
+    end_coord_y   = j_geo_y + 2*j_to_i_y/3,
     .groups = 'drop'
   ) %>%
   filter(if_all(matches('coord'), ~!is.na(.)))

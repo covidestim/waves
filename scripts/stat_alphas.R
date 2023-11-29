@@ -96,6 +96,23 @@ alphas_week <- alphas_week |>
   mutate(i_to_j = str_c(hex_i, hex_j),
          j_to_i = str_c(hex_j, hex_i))
 
+## Alphas x alphas
+alphas_edgelist <- alphas_week |> 
+  select(i,j, alpha) |> 
+  reframe(alpha = sum(alpha, na.rm = T), 
+          .by = c(i,j))
+
+graph_alphas <- igraph::graph_from_data_frame(alphas_edgelist)
+
+igraph::plot
+
+# igraph::plot.igraph(graph_alphas)
+lwcc <- igraph::largest_component(graph = graph_alphas, 
+                                 mode = c("weak"))
+
+lscc <- igraph::largest_component(graph = graph_alphas, 
+                                 mode = c("strong"))
+
 ## Plotting
 alphas_i_to_j_week <- alphas_week |> 
   group_by(i_to_j, date_week) |> 
