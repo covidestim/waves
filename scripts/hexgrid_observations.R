@@ -5,23 +5,37 @@ library(tidyverse)
 library(sf)
 
 ## Reading hex grid
-hexes <- st_read("data-products/geo-hexes/hexes.shp") |> 
-  tigris::shift_geometry()
+hexes <- st_read("data-products/geo-hexes/hexes.shp") 
+# |> 
+#   tigris::shift_geometry()
 
 hexes_obversation <- vroom::vroom("data-products/geo-hexes/hexid-observations.csv")
 
-us_states <- tigris::states(cb = T) |> 
-  tigris::shift_geometry() |> 
-  filter(GEOID <= 56, 
-         !NAME %in% c("Alaska", "Hawaii"))
+us_states <- tigris::counties(cb = T) |> 
+  st_transform(crs = st_crs(hexes)) |> 
+  # tigris::shift_geometry() |> 
+  filter(!STATE_NAME %in% c("Alaska", 
+                            "Hawaii", 
+                            "Puerto Rico", 
+                            "Guam", 
+                            "Commonwealth of the Northern Mariana Islands",
+                            "American Samoa",
+                            "United States Virgin Islands"))
 
 us_map <- st_union(us_states) |> 
   st_as_sf()
 
-plot(us_map)
-plot(st_union(hexes), add = TRUE, title = "Non-filtered hexes")
+ggplot()+
+  geom_sf(data = us_states, 
+          aes(color = "Counties"),
+          fill = "transparent")+
+  geom_sf(data = hexes, 
+          aes(color = "Hexes"), 
+          fill = "transparent")+
+  theme_minimal()+
+  
 
-hexes_within_us_border <- st_intersection(hexes_centroid, us_map)
+hexes_within_us_border <- st_intersection(hexes, us_map)
 
 hexes_filtered <- hexes |> 
   filter(hexid %in% hexes_within_us_border$hexid)
@@ -39,8 +53,7 @@ week <- dates[150]
 
 plot_and_save_frame <- function(week) {
   # Filter the data for the current week
-  data <- hexes_joined[hexes_joined$date == week, ] |> 
-    tigris::shift_geometry()
+  data <- hexes_joined[hexes_joined$date == week, ] 
   
   # Create a ggplot2 plot
   plot <- ggplot() +
@@ -48,18 +61,25 @@ plot_and_save_frame <- function(week) {
             fill = "white")+
     geom_sf(data= data, 
             aes(fill = infectionsPC)) +
-    scale_fill_manual(values = moma.colors(palette_name = "Picasso", 
-                                           n = 11,
-                                           return_hex = T,
-                                           type = "discrete"),
-                      # direction = -1,
-                      # name = "average Infections per capita",
-                      # breaks = seq(0,400,50), 
-                      # limits = c(0,400),  
-                      # oob = scales::squish,
-                      # guide = guide_colorsteps(),
-                      # name = "Infections per Capita", 
-                      na.value = "white")+
+    # scale_fill_manual(values = moma.colors(palette_name = "Picasso",
+    #                                        type = "continuous"),
+    #                   # direction = -1,
+    #                   # name = "average Infections per capita",
+    #                   # breaks = seq(0,400,50), 
+    #                   # limits = c(0,400),  
+    #                   # oob = scales::squish,
+    #                   # guide = guide_colorsteps(),
+    #                   # name = "Infections per Capita", 
+    #                   na.value = "white")+
+    scale_fill_viridis_c(option = "rocket",
+                         direction = -1,
+                         na.value = "darkblue",
+                         breaks = seq(0,400, 50),
+                         limits = c(0,400),
+                         oob = scales::squish,
+                         guide = metR::guide_colorstrip(title.position = "top",
+                                                        title.hjust = 0.5,
+                                                        barwidth = grid::unit(12, "cm")))+
     theme_void() +
     theme(legend.position = "top")
   plot
