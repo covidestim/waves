@@ -1,14 +1,14 @@
 rm(list = ls())
 gc()
 
-
 ## Loading databases
 hexes <- sf::st_read("data-products/geo-hexes/hexes.geojson")
 
 features_from_wkt <- sf::st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt.geojson") 
 
 features_from_wkt <- features_from_wkt |> 
-  # ## filtering to only show alphas >0, and the maximum value between a_ij and a_ji
+  # filtering to only show alphas >0, 
+  # and the maximum value between a_ij and a_ji
   filter(alpha>0, alpha == pmax(alpha),
          .by = c(j,date_week))
 

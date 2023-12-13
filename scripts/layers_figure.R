@@ -62,14 +62,17 @@ rotate_data_geom <- function(data, x_add = 0, y_add = 0) {
     )
 }
 
-## Joined dataset
-
+## Joined datasets
 observation_joined <- us_counties |> 
   right_join(observation,
              by = c("GEOID" = "fips"))
 
+hexes_joined <- hexes |> 
+  right_join(hexes_obversation |> 
+               mutate(hexid = as.character(hexid))) 
+
 ggplot()+
-  geom_sf(data = observation_joined |> 
+  geom_sf(data = hexes_joined |> 
             rotate_data(shear_cos_x = 1.2,
                         shear_sin_x = 1),
           aes(fill = infectionsPC), 
@@ -86,12 +89,8 @@ ggplot()+
   theme_void()+
   theme(legend.position = "none")
 
-hexes_joined <- hexes |> 
-  right_join(hexes_obversation |> 
-               mutate(hexid = as.character(hexid))) 
-
 ggplot()+
-  geom_sf(data = hexes_joined |> 
+  geom_sf(data = observation_joined |> 
             rotate_data(shear_cos_x = 1.2,
                         shear_sin_x = 1),
           aes(fill = infectionsPC), 
@@ -120,7 +119,7 @@ shear_sin_x = 1
 temp1 <- ggplot() +
   
   # Covidestim obsevartions on counties polygons
-  geom_sf(data = observation_joined %>% 
+  geom_sf(data = hexes_joined %>% 
             rotate_data(shear_cos_x = shear_cos_x,
                         shear_sin_x = shear_sin_x), 
           aes(fill = infectionsPC),
@@ -128,7 +127,7 @@ temp1 <- ggplot() +
           show.legend = FALSE) +
   scale_fill_viridis_c(option = "rocket",
                        direction = -1,
-                       na.value = "darkblue",
+                       # na.value = "darkblue",
                        breaks = seq(0,400, 50),
                        limits = c(0,400),
                        oob = scales::squish,
@@ -136,7 +135,7 @@ temp1 <- ggplot() +
                                                       title.hjust = 0.5,
                                                       barwidth = grid::unit(12, "cm")))+
   annotate("text",
-           label='Infections per capita',
+           label='Infections per capita \n (on hexgrid)',
            x=x,
            y=y,
            hjust = 0,
@@ -151,15 +150,15 @@ temp2 <- temp1 +
   # Counties
   new_scale_fill() + 
   new_scale_color() +
-  geom_sf(data = us_counties %>% 
+  geom_sf(data = hexes %>% 
             rotate_data(shear_cos_x = shear_cos_x,
                         shear_sin_x = shear_sin_x,
                         y_add = 10), 
           fill="white", 
-          color="darkblue", 
+          color="gray50", 
           show.legend = FALSE) +
   annotate("text", 
-           label='Counties polygons', 
+           label='Hexes grid', 
            x=x, 
            y=y+10, 
            hjust = 0, 
@@ -168,14 +167,14 @@ temp2 <- temp1 +
   # Hexes
   new_scale_fill() + 
   new_scale_color() +
-  geom_sf(data = hexes %>% 
+  geom_sf(data = us_counties %>% 
             rotate_data(shear_cos_x = shear_cos_x,
                         shear_sin_y = shear_sin_x,
                         y_add = 20), 
-          color='darkred', 
+          color='gray50', 
           fill="white")+
   annotate("text", 
-           label='Hex grid', 
+           label='Counties polygon', 
            x=x, 
            y=y+20, 
            hjust = 0, 
@@ -184,15 +183,15 @@ temp2 <- temp1 +
   # Hexes observation
   new_scale_fill() + 
   new_scale_color() +
-  geom_sf(data = hexes_joined %>% 
+  geom_sf(data = observation_joined %>% 
             rotate_data(shear_cos_x = shear_cos_x,
                         shear_sin_y = shear_sin_x,
                         y_add = 30), 
           aes(fill = infectionsPC),
           color=NA)+
-  scale_fill_viridis_c(option = "mako",
+  scale_fill_viridis_c(option = "rocket",
                        direction = -1,
-                       na.value = "darkblue",
+                       # na.value = "darkblue",
                        breaks = seq(0,400, 50),
                        limits = c(0,400),
                        oob = scales::squish,
@@ -200,7 +199,7 @@ temp2 <- temp1 +
                                                       title.hjust = 0.5,
                                                       barwidth = grid::unit(12, "cm")))+
   annotate("text", 
-           label='Infections per capita \n (on hexgrid)', 
+           label='Infections per capita', 
            x=x, 
            y=y+30, 
            hjust = 0, 
@@ -209,7 +208,6 @@ temp2 <- temp1 +
   scale_x_continuous(limits = c(-105, -10))+
   theme(legend.position = "none")
 temp2
-
 
 ggsave(filename = "img/layered_plot.png",
        plot = temp2,

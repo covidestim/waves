@@ -60,6 +60,12 @@ scatterplot_raw <- joined_ij |>
   theme(legend.position = "none")
 scatterplot_raw
 
+ggsave(filename = "img/scatterplot_raw_alphas_monthly.png",
+       plot = scatterplot_raw,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
 scatterplot_month <- joined_ij |> 
   ggplot(aes(x = values.itoj, 
              y = values.jtoi, 
@@ -74,6 +80,12 @@ scatterplot_month <- joined_ij |>
   theme(legend.position = "none")
 scatterplot_month
 
+ggsave(filename = "img/scatterplot_facetted_alphas_monthly.png",
+       plot = scatterplot_month,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
 hist_month <- joined_ij |> 
   pivot_longer(cols = values.itoj:values.jtoi,
                names_to = "relation",
@@ -85,6 +97,12 @@ hist_month <- joined_ij |>
   theme_minimal()
 hist_month
 
+ggsave(filename = "img/histogram_alphas_monthly.png",
+       plot = hist_month,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
 ## Reading the weekly model output
 alphas_week <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat.csv")
 
@@ -95,23 +113,6 @@ alphas_week <- alphas_week |>
   ## Creating a 8-digit hexbin code to identifying uniquely them
   mutate(i_to_j = str_c(hex_i, hex_j),
          j_to_i = str_c(hex_j, hex_i))
-
-## Alphas x alphas
-alphas_edgelist <- alphas_week |> 
-  select(i,j, alpha) |> 
-  reframe(alpha = sum(alpha, na.rm = T), 
-          .by = c(i,j))
-
-graph_alphas <- igraph::graph_from_data_frame(alphas_edgelist)
-
-igraph::plot
-
-# igraph::plot.igraph(graph_alphas)
-lwcc <- igraph::largest_component(graph = graph_alphas, 
-                                 mode = c("weak"))
-
-lscc <- igraph::largest_component(graph = graph_alphas, 
-                                 mode = c("strong"))
 
 ## Plotting
 alphas_i_to_j_week <- alphas_week |> 
@@ -151,6 +152,12 @@ scatterplot_raw_week <- joined_ij_week |>
   theme(legend.position = "none")
 scatterplot_raw_week
 
+ggsave(filename = "img/scatterplot_raw_alphas_weekly.png",
+       plot = scatterplot_raw_week,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
 scatterplot_weekly <- joined_ij_week |> 
   ggplot(aes(x = values.itoj, 
              y = values.jtoi, 
@@ -165,6 +172,12 @@ scatterplot_weekly <- joined_ij_week |>
   theme(legend.position = "none")
 scatterplot_weekly
 
+ggsave(filename = "img/scatterplot_facetted_alphas_weekly.png",
+       plot = scatterplot_weekly,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
 hist_weekly <- joined_ij_week |> 
   pivot_longer(cols = values.itoj:values.jtoi,
                names_to = "relation",
@@ -175,6 +188,12 @@ hist_weekly <- joined_ij_week |>
   facet_wrap(type~., scales = "free")+
   theme_minimal()
 hist_weekly
+
+ggsave(filename = "img/histogram_alphas_weekly.png",
+       plot = hist_weekly,
+       width = 16,
+       height = 9, 
+       dpi = 100)
 
 
 # 
