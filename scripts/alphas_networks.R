@@ -95,14 +95,18 @@ pheatmap::pheatmap(m,
 
 alphas_tile <- alphas_week |> 
   reframe(alpha = sum(alpha, na.rm = T), 
-          .by = c(i,j))
+          .by = c(i,j)) |> 
+  complete(i,j)
 
-alphas_tile |> 
-  ggplot(aes(x = -i, y = j, color = factor(alpha)))+
+alphas_tile |>
+  filter(i %in% c(1:150),
+         j %in% c(1:150)) |>
+  ggplot(aes(x = i, y = j, fill = alpha))+
   geom_tile()+
-  theme_void()+
-  # scale_color_viridis_d(option = "plasma", na.value = "black")+
-  coord_fixed()
+  theme_minimal()+
+  scale_fill_viridis_c(option = "plasma", na.value = "black")+
+  coord_fixed()+
+  theme(legend.position = "bottom")
 
 
 graph_alphas <- igraph::graph_from_adjacency_matrix(test)

@@ -89,7 +89,7 @@ transform!(joined, [:i, :j, :date] =>
 # select(joined, :interactionTerm)
 # joined
 
-autocorr = false
+autocorr = true
 ## Choosing between a autocorr term model or a without autocorr model term
  if autocorr #!args["--no-autocorr"]
      formula = @formula(
@@ -151,6 +151,7 @@ print(effects)
 if autocorr
   CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt.csv", effects)
 else
-  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt.csv", effects)
+  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_no_autocorr.csv", effects)
+end
 
 # CSV.write("data-products/geo-hexes/mixedmodel/joined-weekly.csv", joined)

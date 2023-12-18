@@ -14,6 +14,8 @@ hexes_obversation <- vroom::vroom("data-products/geo-hexes/hexid-observations.cs
 ## Reading observation
 covidestim_observation <- vroom::vroom("data-products/covidestim-observations.csv")
 
+omicronera_observation <- vroom::vroom("data-products/omicronera_observation.csv.xz")
+
 ## US Counties
 us_counties <- tigris::counties(cb = T) |> 
   st_transform(crs = st_crs(hexes)) |> 
@@ -26,9 +28,17 @@ us_counties <- tigris::counties(cb = T) |>
                             "American Samoa",
                             "United States Virgin Islands"))
 
+## One dataset for all
+
+covidestim_observation <- covidestim_observation |> 
+  mutate(date_week = )
+
+
 ## Fig.1 Patterns of synchronization
+covidestim <- full_join(covidestim_observation, omicronera_observation)
+
 fig1_data <- us_counties |> 
-  left_join(covidestim_observation,
+  left_join(covidestim,
             by = c("GEOID" = "fips"))
 
 breaks_plt <- seq(0,600, 100)
@@ -220,12 +230,13 @@ shear_sin_x = 1
 fig2a <- ggplot() +
   
   # Covidestim obsevartions on counties polygons
-  geom_sf(data = hexes_joined %>% 
-            rotate_data(shear_cos_x = shear_cos_x,
-                        shear_sin_x = shear_sin_x), 
+  geom_sf(data = hexes_joined, 
           aes(fill = infectionsPC),
           color=NA, 
           show.legend = FALSE) +
+  geom_sf(data = us_counties,
+          color = "gray80",
+          fill = NA)+
   scale_fill_viridis_c(option = "rocket",
                        direction = -1,
                        # na.value = "darkblue",
@@ -235,12 +246,12 @@ fig2a <- ggplot() +
                        guide = metR::guide_colorstrip(title.position = "top",
                                                       title.hjust = 0.5,
                                                       barwidth = grid::unit(12, "cm")))+
-  annotate("text",
-           label='Infections per capita \n (on hexgrid)',
-           x=x,
-           y=y,
-           hjust = 0,
-           color=color) +
+  # annotate("text",
+  #          label='Infections per capita \n (on hexgrid)',
+  #          x=x,
+  #          y=y,
+  #          hjust = 0,
+  #          color=color) +
   theme_void()+
   theme(legend.position = "none")
 fig2a
