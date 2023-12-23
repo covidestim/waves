@@ -20,7 +20,7 @@ library(docopt)
 # args <- docopt(doc, version = 'transformResults_weekly.R 0.1')
 
 d <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera.csv",
   col_types = cols(
     interactionTerm = col_character(),
     `(Intercept)` = col_number()
@@ -28,16 +28,17 @@ d <- read_csv(
 )
 
 d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) |> 
-  separate(alpha, into = c("i", "j", "year", "month", "week"), sep = "-") |> 
+  separate(alpha, into = c("i", "j", "year", "month", "day"), sep = "-") |> 
   transmute(
     i, j,
-    date = glue("{year}-{month}-01") |> as.Date(),
-    week = glue("{week}") |> as.integer(),
+    date_week = glue("{year}-{month}-{day}") |> as.Date(),
+    # week = glue("{week}") |> as.integer(),
     alpha = value,
     value # backwards-compatibility, for now
-  ) |> 
-  # Creating a date using the month and week
-  mutate(date_week = ymd(date) + (week - week(date))*7)
+  ) 
+# |> 
+#   # Creating a date using the month and week
+#   mutate(date_week = ymd(date) + (week - week(date))*7)
 
 d1_with_normalized <- d1 |>  
   ## Should be grouped by i, not by j
@@ -45,5 +46,8 @@ d1_with_normalized <- d1 |>
   mutate(alpha_normalized = alpha / mean(abs(alpha)))
 
 write_csv(d1_with_normalized, 
-          "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat.csv")
+          "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera.csv")
+
+vroom::vroom_write(d1_with_normalized, 
+          "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera.csv.xz")
   

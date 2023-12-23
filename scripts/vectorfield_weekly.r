@@ -44,7 +44,7 @@ neighbors <- read_csv(
 
 # ps("Reading {.file {args$alphas}}")
 alphas <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera.csv",
   col_types = cols_only(
     i = col_character(), j = col_character(),
     date_week = col_date(),
@@ -56,7 +56,7 @@ alphas <- read_csv(
 
 # ps("Reading {.file {args$observations}}")
 observations <- read_csv(
-  "data-products/geo-hexes/hexid-observations.csv",
+  "data-products/geo-hexes/hexid-observations_omicron.csv",
   col_types = cols(
     hexid = col_character(),
     date = col_date(),
@@ -104,7 +104,14 @@ from_j_to_i <-
 # pd()
 
 # ps("Joining alphas to neighbors library")
-joined <- inner_join(from_j_to_i, alphas, by = c("i", "j"))
+joined <- inner_join(from_j_to_i, alphas, by = c("i", "j")) 
+# |> 
+#   ## mutating i and j to character
+#   mutate(i = as.double(i),
+#          j = as.double(j)) |> 
+#   ## Writing the hexbin code as a 4-digit number
+#   mutate(hex_i = sprintf("%04d", i),
+#          hex_j = sprintf("%04d", j))
 # pd()                    
 
 # ps("Computing mean vector for every {.code i,date} combination")
@@ -155,9 +162,14 @@ vector_mean <- joined %>%
 # ps("Joining average infections per capita to mean vectors")
 ## Verify closer the week flooring , maybe this is cutting off some dates
 joined_vector_mean <- vector_mean |> 
+  # mutate(date_week = floor_date(date_week, unit = "week", week_start = "Thursday")) |>
   inner_join(observations_date |> 
-               rename(date_week = date), 
-             alphas, 
+               rename(date_week = date),
+             # |> 
+             #   mutate(date_week = floor_date(date_week, unit = "week", week_start = "Thursday")), 
+             alphas,
+             # |> 
+             #   mutate(date_week = floor_date(date_week, unit = "week", week_start = "Thursday")), 
              by = c("j", "date_week"))
 # pd()
 
@@ -177,7 +189,12 @@ features_from_wkt <- joined_vector_mean %>%
 ## Maybe we have to cast this object as LINESTRING from POINT geometry, instead of writing it manually
 
 # ps("Writing {.file {args$o}}")
-write_sf(features_from_wkt, 
-         "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt.geojson", 
+write_sf(features_from_wkt,
+         "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_omicronera.geojson",
          append = F)
+
+# geojson_write(input = features_from_wkt,
+#               file = "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_omicron.geojson",
+#               geometry = "LINESTRING", 
+#               crs = 4326)
 # pd()

@@ -16,6 +16,15 @@ covidestim_observation <- vroom::vroom("data-products/covidestim-observations.cs
 
 omicronera_observation <- vroom::vroom("data-products/omicronera_observation.csv.xz")
 
+## Population
+population <- tidycensus::get_decennial(geography = 'county', 
+                                 variables = 'P2_001N',
+                                 geometry = F,
+                                 year = 2020) |> 
+  mutate(fips = GEOID,
+         population = value) |> 
+  select(fips, population)
+
 ## US Counties
 us_counties <- tigris::counties(cb = T) |> 
   st_transform(crs = st_crs(hexes)) |> 
@@ -29,52 +38,117 @@ us_counties <- tigris::counties(cb = T) |>
                             "United States Virgin Islands"))
 
 ## One dataset for all
+covidestim_week <- covidestim_observation |> 
+  mutate(date_week = lubridate::floor_date(date, unit = "week", week_start = "Thursday")) |> 
+  reframe(cases = sum(cases, na.rm = T),
+          Rt = round(mean(Rt, na.rm = T), 3),
+          infections = round(sum(infections, na.rm = T), 2),
+          infectionsPC = round(sum(infectionsPC, na.rm = T),2),
+          .by = c("fips", "date_week"))
 
-covidestim_observation <- covidestim_observation |> 
-  mutate(date_week = )
+omicronera_week <- omicronera_observation |> 
+  rename(date_week = date) |> 
+  reframe(cases = sum(cases, na.rm = T),
+          Rt = round(mean(Rt, na.rm = T), 3),
+          infections = round(sum(infections, na.rm = T), 2),
+          infectionsPC = round(sum(infectionsPC, na.rm = T),2),
+          .by = c("fips", "date_week"))
 
-
+covidestim <- rbind(covidestim_week, 
+                    omicronera_week) |> 
+  left_join(population) |> 
+  mutate(infectionsPC_new = round((infections/population)*1e5, 2))
+  
 ## Fig.1 Patterns of synchronization
-covidestim <- full_join(covidestim_observation, omicronera_observation)
-
 fig1_data <- us_counties |> 
   left_join(covidestim,
             by = c("GEOID" = "fips"))
 
-breaks_plt <- seq(0,600, 100)
-labels_plt <- c(seq(0,500, 100), '600+')
-limits_plt <- c(0,600)
+dates <- unique(covidestim$date_week)
 
-fig1a <- ggplot()+
-  geom_sf(data = us_counties,
-          fill = "gray80",
-          color = NA)+
-  geom_sf(data = fig1_data  |> 
-            filter(date == as.Date("2021-09-01") - 42),
-          aes(fill = infectionsPC),
-          color = NA)+
-  scale_fill_viridis_c(option = "rocket",
-                       direction = -1,
-                       # na.value = "darkblue",
-                       breaks = breaks_plt,
-                       labels = labels_plt,
-                       limits = limits_plt,
-                       oob = scales::squish,
-                       guide = metR::guide_colorstrip(title = "Estimated infection/100k/day",
-                                                      title.position = "top",
-                                                      title.hjust = 0.5,
-                                                      barwidth = grid::unit(12, "cm")))+
-  theme_void() +
-  theme(legend.position = "top")+
-  labs(subtitle = as.Date("2021-09-01") - 42)
+## Date of maximum infections per capita at national level
+date_peak_preomicron <- as.Date("2021-08-26")
+date_peak_omicronera <- as.Date("2022-01-20")
+
+fig1a <- covidestim |> 
+  reframe(infectionsPC = sum(infectionsPC, na.rm = T)/7,
+          .by = "date_week") |> 
+  ggplot(aes(x = date_week, y = infectionsPC))+
+  geom_line()+
+  theme_minimal()+
+  scale_x_date(name = "Date", 
+               date_breaks = "4 months", 
+               date_labels = "%b %y'")+
+  scale_y_continuous(name = "Estimated infection/day",
+                     labels = scales::label_comma())+
+  ## Pre-Omicron model
+  geom_vline(xintercept = date_peak_preomicron - 42, 
+             color = "gray80")+
+  annotate("text", 
+           x = date_peak_preomicron - 45, 
+           y = 1e6,
+           label = "B",
+           size = 6)+
+  geom_vline(xintercept = date_peak_preomicron - 21,
+             color = "gray80")+
+  annotate("text", 
+           x = date_peak_preomicron - 24, 
+           y = 1e6,
+           label = "C",
+           size = 6)+
+  geom_vline(xintercept = date_peak_preomicron,
+             color = "gray80")+
+  annotate("text", 
+           x = date_peak_preomicron - 3, 
+           y = 1e6,
+           label = "D",
+           size = 6)+
+  ## Omicron era model
+  geom_vline(xintercept = date_peak_omicronera - 42, 
+             color = "gray80")+
+  annotate("text", 
+           x = date_peak_omicronera - 45, 
+           y = 4e6,
+           label = "E",
+           size = 6)+
+  geom_vline(xintercept = date_peak_omicronera - 21,
+             color = "gray80")+
+  annotate("text", 
+           x = date_peak_omicronera - 24, 
+           y = 4e6,
+           label = "F",
+           size = 6)+
+  geom_vline(xintercept = date_peak_omicronera,
+             color = "gray80")+
+  annotate("text", 
+           x = date_peak_omicronera - 3, 
+           y = 4e6,
+           label = "G",
+           size = 6)+
+  theme(axis.text = element_text(size = 14),
+        # axis.text.x = element_text(angle = 90),
+        axis.title = element_text(size = 14))
 fig1a
+
+ggsave(filename = "img/extra_figures/fig1a.png",
+       plot = fig1a,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+## Alpha peak snapshots
+
+## Breakdowns of each peaks
+breaks_plt <- seq(0,1000, 100)
+labels_plt <- c(seq(0,900, 100), '1000+')
+limits_plt <- c(0,1000)
 
 fig1b <- ggplot()+
   geom_sf(data = us_counties,
           fill = "gray80",
           color = NA)+
-  geom_sf(data = fig1_data  |> 
-            filter(date == as.Date("2021-09-01") - 21),
+  geom_sf(data = fig1_data |> 
+            filter(date_week == date_peak_preomicron - 42),
           aes(fill = infectionsPC),
           color = NA)+
   scale_fill_viridis_c(option = "rocket",
@@ -90,15 +164,21 @@ fig1b <- ggplot()+
                                                       barwidth = grid::unit(12, "cm")))+
   theme_void() +
   theme(legend.position = "top")+
-  labs(subtitle = as.Date("2021-09-01") - 21)
+  labs(title = date_peak_preomicron - 42)
 fig1b
+
+ggsave(filename = "img/extra_figures/fig1b.png",
+       plot = fig1b,
+       width = 16,
+       height = 9, 
+       dpi = 100)
 
 fig1c <- ggplot()+
   geom_sf(data = us_counties,
           fill = "gray80",
           color = NA)+
   geom_sf(data = fig1_data  |> 
-            filter(date == as.Date("2021-09-01")),
+            filter(date_week == date_peak_preomicron - 21),
           aes(fill = infectionsPC),
           color = NA)+
   scale_fill_viridis_c(option = "rocket",
@@ -114,46 +194,136 @@ fig1c <- ggplot()+
                                                       barwidth = grid::unit(12, "cm")))+
   theme_void() +
   theme(legend.position = "top")+
-  labs(subtitle = as.Date("2021-09-01"))
+  labs(title = date_peak_preomicron - 21)
 fig1c
 
-fig1d <- covidestim_observation |> 
-  reframe(infectionsPC = sum(infectionsPC, na.rm = T),
-          .by = "date") |> 
-  ggplot(aes(x = date, y = infectionsPC))+
-  geom_line()+
-  theme_minimal()+
-  scale_x_date(name = "Date", 
-               date_breaks = "3 months", 
-               date_labels = "%b %y'")+
-  scale_y_continuous(name = "Estimated infection/100k/day",
-                     labels = scales::label_comma())+
-  geom_vline(xintercept = as.Date("2021-09-01") - 42, 
-             color = "gray80")+
-  annotate("text", 
-           x = as.Date("2021-09-01") - 45, 
-           y = 700000,
-           label = "B")+
-  geom_vline(xintercept = as.Date("2021-09-01") - 21,
-             color = "gray80")+
-  annotate("text", 
-           x = as.Date("2021-09-01") - 24, 
-           y = 700000,
-           label = "C")+
-  geom_vline(xintercept = as.Date("2021-09-01"),
-             color = "gray80")+
-  annotate("text", 
-           x = as.Date("2021-09-01") - 3, 
-           y = 700000,
-           label = "D")+
-  theme(axis.text = element_text(size = 14),
-        axis.text.x = element_text(angle = 90),
-        axis.title = element_text(size = 14))
+ggsave(filename = "img/extra_figures/fig1c.png",
+       plot = fig1c,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+fig1d <- ggplot()+
+  geom_sf(data = us_counties,
+          fill = "gray80",
+          color = NA)+
+  geom_sf(data = fig1_data  |> 
+            filter(date_week == date_peak_preomicron),
+          aes(fill = infectionsPC),
+          color = NA)+
+  scale_fill_viridis_c(option = "rocket",
+                       direction = -1,
+                       # na.value = "darkblue",
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+                       oob = scales::squish,
+                       guide = metR::guide_colorstrip(title = "Estimated infection/100k/day",
+                                                      title.position = "top",
+                                                      title.hjust = 0.5,
+                                                      barwidth = grid::unit(12, "cm")))+
+  theme_void() +
+  theme(legend.position = "top")+
+  labs(title = date_peak_preomicron)
 fig1d
 
+ggsave(filename = "img/extra_figures/fig1d.png",
+       plot = fig1d,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+## Omicron BA.1 peak snapshots
+
+## Breakdowns of each peaks
+breaks_plt <- seq(0,5000, 500)
+labels_plt <- c(seq(0,4900, 500), '5000+')
+limits_plt <- c(0,5000)
+
+fig1e <- ggplot()+
+  geom_sf(data = us_counties,
+          fill = "gray80",
+          color = NA)+
+  geom_sf(data = fig1_data |> 
+            filter(date_week == date_peak_omicronera - 42),
+          aes(fill = infectionsPC),
+          color = NA)+
+  scale_fill_viridis_c(option = "rocket",
+                       direction = -1,
+                       # na.value = "darkblue",
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+                       oob = scales::squish,
+                       guide = metR::guide_colorstrip(title = "Estimated infection/100k/day",
+                                                      title.position = "top",
+                                                      title.hjust = 0.5,
+                                                      barwidth = grid::unit(12, "cm")))+
+  theme_void() +
+  theme(legend.position = "top")+
+  labs(title = date_peak_omicronera - 42)
+fig1e
+
+ggsave(filename = "img/extra_figures/fig1e.png",
+       plot = fig1e,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+fig1f <- ggplot()+
+  geom_sf(data = us_counties,
+          fill = "gray80",
+          color = NA)+
+  geom_sf(data = fig1_data  |> 
+            filter(date_week == date_peak_omicronera - 21),
+          aes(fill = infectionsPC),
+          color = NA)+
+  scale_fill_viridis_c(option = "rocket",
+                       direction = -1,
+                       # na.value = "darkblue",
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+                       oob = scales::squish,
+                       guide = metR::guide_colorstrip(title = "Estimated infection/100k/day",
+                                                      title.position = "top",
+                                                      title.hjust = 0.5,
+                                                      barwidth = grid::unit(12, "cm")))+
+  theme_void() +
+  theme(legend.position = "top")+
+  labs(title = date_peak_omicronera - 21)
+fig1f
+
+fig1g <- ggplot()+
+  geom_sf(data = us_counties,
+          fill = "gray80",
+          color = NA)+
+  geom_sf(data = fig1_data  |> 
+            filter(date_week == date_peak_omicronera),
+          aes(fill = infectionsPC),
+          color = NA)+
+  scale_fill_viridis_c(option = "rocket",
+                       direction = -1,
+                       # na.value = "darkblue",
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+                       oob = scales::squish,
+                       guide = metR::guide_colorstrip(title = "Estimated infection/100k/day",
+                                                      title.position = "top",
+                                                      title.hjust = 0.5,
+                                                      barwidth = grid::unit(12, "cm")))+
+  theme_void() +
+  theme(legend.position = "top")+
+  labs(title = date_peak_omicronera)
+fig1g
+
 library(patchwork)
-fig1 <- (fig1d/(fig1a | fig1b | fig1c))+
-  plot_layout(guides = 'collect')+
+fig1 <- (fig1a/(((fig1b | fig1c | fig1d)+
+                  plot_layout(guides = 'collect'))/
+                  ((fig1e | fig1f | fig1g)+
+                  plot_layout(guides = 'collect'))))+
+  plot_layout(heights = c(1,3))+
   plot_annotation(tag_levels = 'A')&
   theme(legend.position = "bottom")
 fig1

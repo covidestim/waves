@@ -19,7 +19,7 @@ neighbors = CSV.read(
 
 ## Reading hexid observations
 results = CSV.read(
-  "data-products/geo-hexes/hexid-observations.csv", 
+  "data-products/geo-hexes/hexid-observations_omicron.csv", 
   DataFrame;
   types=Dict(
     geosym        => String,
@@ -79,7 +79,7 @@ function lagsForVariable_i(df, variable, lags)
 end
 
 # Assembling all lags for each observation
-lags = [1, 7, 14, 21]
+lags = [1, 2, 3] # As we are now with a weekly dataset, each lag it is a week lag, not a daily one
 lagsForVariable_j(joined, outcome_j_symbol, lags)
 lagsForVariable_i(joined, outcome_i_symbol, lags)
 
@@ -113,15 +113,15 @@ autocorr = true
        (1 | interactionTerm) +
   
        # Lags (fixed effects)
-       outcome_j_7 +
-       outcome_j_14 +
-       outcome_j_21 +
+       outcome_j_1 +
+       outcome_j_2 +
+       outcome_j_3 +
   
        # Autocorr (fixed effect)
        #outcome_i_1 +
-       outcome_i_7 +
-       outcome_i_14 +
-       outcome_i_21
+       outcome_i_1 +
+       outcome_i_2 +
+       outcome_i_3
   
        # (EMPTY) covariates
   
@@ -135,9 +135,9 @@ autocorr = true
       (1 | interactionTerm) +
   
       # Lags (fixed effects)
-      outcome_j_7 +
-      outcome_j_14 +
-      outcome_j_21
+      outcome_j_1 +
+      outcome_j_2 +
+      outcome_j_3 
   )
   end
 ##
@@ -157,9 +157,9 @@ print(effects)
 
 # Writing alphas .csv
 if autocorr
-  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron.csv", effects)
+  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera.csv", effects)
 else
-  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_no_autocorr.csv", effects)
+  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera_no_autocorr.csv", effects)
 end
 
 # CSV.write("data-products/geo-hexes/mixedmodel/joined-weekly.csv", joined)
