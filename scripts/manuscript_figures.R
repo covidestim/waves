@@ -3,7 +3,7 @@ gc()
 
 library(tidyverse)
 library(sf)
-library(MoMAColors)
+# library(MoMAColors)
 
 ## Reading hex grid
 hexes <- st_read("data-products/geo-hexes/hexes.shp") 
@@ -498,9 +498,26 @@ ggsave(filename = "img/fig2a.png",
 
 ## Scatterplot to alphas
 ## Reading the weekly model output
-alphas_week <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat.csv")
+alphas_week <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera_main.csv")
 
 alphas_week <- alphas_week |> 
+  rename(alpha=interactionTerm, value=`(Intercept)`) |> 
+  separate(alpha, into = c("i", "j", "year", "month", "week"), sep = "-") |> 
+  transmute(
+    i, j,
+    date = glue("{year}-{month}-01") |> as.Date(),
+    week = glue("{week}") |> as.integer(),
+    alpha = value,
+    value # backwards-compatibility, for now
+  ) |>
+  # Creating a date using the month and week
+  mutate(date_week = floor_date(ymd(date) + (week - week(date))*7,
+                                unit = "week", 
+                                week_start = "Thursday"))
+
+alphas_week <- alphas_week |> 
+  mutate(i = as.integer(i),
+         j = as.integer(j)) |> 
   ## Writing the hexbin code as a 4-digit number
   mutate(hex_i = sprintf("%04d", i),
          hex_j = sprintf("%04d", j)) |> 
@@ -511,9 +528,10 @@ alphas_week <- alphas_week |>
 ## Plotting
 alphas_i_to_j_week <- alphas_week |> 
   group_by(i_to_j, date_week) |> 
-  summarise(raw = alpha,
-            normalized = alpha_normalized) |>
-  mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
+  summarise(raw = alpha)
+  # summarise(raw = alpha,
+  #           normalized = alpha_normalized) |>
+  # mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
   pivot_longer(cols = raw:standarlized,
                names_to = "type",
                values_to = "values")
@@ -540,14 +558,15 @@ fig2b <- joined_ij_week |>
   geom_point(alpha = 0.01)+
   theme_minimal()+
   labs(x = expression(alpha["i,j"]),
-       y = expression(alpha["j,i"]))+
-  lims(x = c(-50,60), y = c(-50, 60))+
+       y = expression(alpha["j,i"]), 
+       title = "Pre-Omicron Main Model")+
+  # lims(x = c(-50,60), y = c(-50, 60))+
   theme(legend.position = "none", 
         axis.title = element_text(size = 14), 
         axis.text = element_text(size = 14))
 fig2b
 
-ggsave(filename = "img/fig2b.png",
+ggsave(filename = "img/fig2b_preomicron_SAII.png",
        plot = fig2b,
        width = 16,
        height = 9, 

@@ -79,7 +79,7 @@ function lagsForVariable_i(df, variable, lags)
 end
 
 # Assembling all lags for each observation
-lags = [1, 7, 14, 21]
+lags = [7, 14, 21]
 lagsForVariable_j(joined, outcome_j_symbol, lags)
 lagsForVariable_i(joined, outcome_i_symbol, lags)
 
@@ -95,71 +95,145 @@ rename!(joined, outcome_i_symbol => :outcome_i)
 # Performing categorical encoding of interaction term
 transform!(joined, [:i, :j, :date] =>
   ((i, j, date) -> 
-    categorical(string.(i, "-", j, "-", year.(date), "-", month.(date), "-", day.(date))))
+    categorical(string.(i, "-", j, "-", year.(date), "-", month.(date), "-", week.(date))))
   => :interactionTerm
 )
-# show(names(joined))
-# select(joined, :interactionTerm)
-# joined
 
-autocorr = true
-## Choosing between a autocorr term model or a without autocorr model term
- if autocorr #!args["--no-autocorr"]
-     formula = @formula(
-     outcome_i ~
-       0 + 
-  
-       # Interaction term (random effect)
-       (1 | interactionTerm) +
-  
-       # Lags (fixed effects)
-       outcome_j_7 +
-       outcome_j_14 +
-       outcome_j_21 +
-  
-       # Autocorr (fixed effect)
-       #outcome_i_1 +
-       outcome_i_7 +
-       outcome_i_14 +
-       outcome_i_21
-  
-       # (EMPTY) covariates
-  
-   )
-  else
-    formula = @formula(
-    outcome_i ~
-      0 + 
-  
-      # Interaction term (random effect)
-      (1 | interactionTerm) +
-  
+## Main analysis model:
+## outcome_i ~ (1|interactionTerm) + outcome_j_1 + outcome_j_2 + outcome_i_1
+formula_main = @formula(outcome_i ~ 0 + (1 | interactionTerm) + 
+      # Lags (fixed effects)
+      outcome_j_7 +
+      outcome_j_14 +
+      outcome_j_21 +
+      # Autocorr (fixed effect)
+      outcome_i_7)
+
+print(formula_main)
+
+# Fitting mixed model
+model_main = fit(MixedModel, formula_main, joined, contrasts=Dict(:interactionTerm => Grouping()))
+      
+println(model_main)
+      
+## Separate the condiotional means of the random effects form the model
+effects_main = DataFrame(only(raneftables(model_main)))
+      
+print(effects_main)
+
+## Writing alphas .csv
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_main.csv", effects_main)
+
+## Sensitivity Analysis I (SAI) analysis model:
+## outcome_i ~ (1|interactionTerm) + outcome_j_1 + outcome_j_2 + outcome_i_1 + outcome_i_2 + outcome_i_3
+formula_SAI = @formula(outcome_i ~ 0 + (1 | interactionTerm) + 
+      # Lags (fixed effects)
+      outcome_j_7 +
+      outcome_j_14 +
+      outcome_j_21 +
+      # Autocorr (fixed effect)
+      outcome_i_7 + 
+      outcome_i_14 + 
+      outcome_i_21)
+
+print(formula_SAI)
+
+# Fitting mixed model
+model_SAI = fit(MixedModel, formula_SAI, joined, contrasts=Dict(:interactionTerm => Grouping()))
+      
+println(model_SAI)
+      
+## Separate the condiotional means of the random effects form the model
+effects_SAI = DataFrame(only(raneftables(model_SAI)))
+      
+print(effects_SAI)
+
+## Writing alphas .csv
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_SAI.csv", effects_SAI)
+
+## Sensitivity Analysis II (SAII) analysis model:
+## outcome_i ~ (1|interactionTerm) + outcome_j_1
+formula_SAII = @formula(outcome_i ~ 0 + (1 | interactionTerm) + 
       # Lags (fixed effects)
       outcome_j_7 +
       outcome_j_14 +
       outcome_j_21
-  )
-  end
-##
+      )
 
-print(formula)
+print(formula_SAII)
 
 # Fitting mixed model
-model = fit(MixedModel, formula, joined, contrasts=Dict(:interactionTerm => Grouping()))
-# println("Fit complete")
-
-println(model)
-
+model_SAII = fit(MixedModel, formula_SAII, joined, contrasts=Dict(:interactionTerm => Grouping()))
+      
+println(model_SAII)
+      
 ## Separate the condiotional means of the random effects form the model
-effects = DataFrame(only(raneftables(model)))
+effects_SAII = DataFrame(only(raneftables(model_SAII)))
+      
+print(effects_SAII)
 
-print(effects)
+## Writing alphas .csv
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_SAII.csv", effects_SAII)
 
-# Writing alphas .csv
-if autocorr
-  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron.csv", effects)
-else
-  CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_no_autocorr.csv", effects)
-end
+# autocorr = true
+# ## Choosing between a autocorr term model or a without autocorr model term
+#  if autocorr #!args["--no-autocorr"]
+#      formula = @formula(
+#      outcome_i ~
+#        0 + 
+  
+#        # Interaction term (random effect)
+#        (1 | interactionTerm) +
+  
+#        # Lags (fixed effects)
+#        #outcome_j_1 +
+#        outcome_j_7 +
+#        outcome_j_14 +
+#        outcome_j_21 +
+  
+#        # Autocorr (fixed effect)
+#        #outcome_i_1 +
+#        outcome_i_7 #+
+#        #outcome_i_14 +
+#        #outcome_i_21
+  
+#        # (EMPTY) covariates
+  
+#    )
+#   else
+#     formula = @formula(
+#     outcome_i ~
+#       0 + 
+  
+#       # Interaction term (random effect)
+#       (1 | interactionTerm) +
+  
+#       # Lags (fixed effects)
+#       outcome_j_7 +
+#       outcome_j_14 +
+#       outcome_j_21
+#   )
+#   end
+# ##
 
-# CSV.write("data-products/geo-hexes/mixedmodel/joined-weekly.csv", joined)
+# print(formula)
+
+# # Fitting mixed model
+# model = fit(MixedModel, formula, joined, contrasts=Dict(:interactionTerm => Grouping()))
+# # println("Fit complete")
+
+# println(model)
+
+# ## Separate the condiotional means of the random effects form the model
+# effects = DataFrame(only(raneftables(model)))
+
+# print(effects)
+
+# # Writing alphas .csv
+# if autocorr
+#   CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron.csv", effects)
+# else
+#   CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_no_autocorr.csv", effects)
+# end
+
+# # CSV.write("data-products/geo-hexes/mixedmodel/joined-weekly.csv", joined)

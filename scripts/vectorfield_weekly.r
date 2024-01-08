@@ -48,7 +48,8 @@ alphas <- read_csv(
   col_types = cols_only(
     i = col_character(), j = col_character(),
     date_week = col_date(),
-    week = col_number(),
+    # week = col_number(),
+    value = col_number(),
     alpha_normalized = col_number(),
     alpha = col_number()
   )
