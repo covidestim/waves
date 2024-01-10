@@ -49,6 +49,7 @@ sort!(joined, :date)
 ## Predciting variable, can be 'infectionsPC', 'Rt', etc.
 outcome_i_symbol = Symbol("infectionsPC" * "_i")
 print(outcome_i_symbol)
+
 ## Covariate variable used to predict, can be 'infectionsPC', 'Rt', etc.
 outcome_j_symbol = Symbol("infectionsPC" * "_j")
 print(outcome_j_symbol)
@@ -79,7 +80,7 @@ function lagsForVariable_i(df, variable, lags)
 end
 
 # Assembling all lags for each observation
-lags = [1, 7, 14, 21] # As we are now with a weekly dataset, each lag it is a week lag, not a daily one
+lags = [1, 2, 3] # As we are now with a weekly dataset, each lag it is a week lag, not a daily one
 lagsForVariable_j(joined, outcome_j_symbol, lags)
 lagsForVariable_i(joined, outcome_i_symbol, lags)
 
@@ -95,7 +96,7 @@ rename!(joined, outcome_i_symbol => :outcome_i)
 # Performing categorical encoding of interaction term
 transform!(joined, [:i, :j, :date] =>
   ((i, j, date) -> 
-    categorical(string.(i, "-", j, "-", year.(date), "-", month.(date), "-", week.(date))))
+    categorical(string.(i, "-", j, "-", year.(date), "-", month.(date), "-", day.(date))))
   => :interactionTerm
 )
 
@@ -103,11 +104,11 @@ transform!(joined, [:i, :j, :date] =>
 ## outcome_i ~ (1|interactionTerm) + outcome_j_1 + outcome_j_2 + outcome_i_1
 formula_main = @formula(outcome_i ~ 0 + (1 | interactionTerm) + 
       # Lags (fixed effects)
-      outcome_j_7 +
-      outcome_j_14 +
-      outcome_j_21 +
+      outcome_j_1 +
+      outcome_j_2 +
+      outcome_j_3 +
       # Autocorr (fixed effect)
-      outcome_i_7)
+      outcome_i_1)
 
 print(formula_main)
 

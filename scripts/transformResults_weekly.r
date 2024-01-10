@@ -20,7 +20,7 @@ library(docopt)
 # args <- docopt(doc, version = 'transformResults_weekly.R 0.1')
 
 d <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera_main.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera_SAII.csv",
   col_types = cols(
     interactionTerm = col_character(),
     `(Intercept)` = col_number()
@@ -31,8 +31,8 @@ d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) |>
   separate(alpha, into = c("i", "j", "year", "month", "week"), sep = "-") |> 
   transmute(
     i, j,
-    date = glue("{year}-{month}-01") |> as.Date(),
-    week = glue("{week}") |> as.integer(),
+    date = glue::glue("{year}-{month}-01") |> as.Date(),
+    week = glue::glue("{week}") |> as.integer(),
     alpha = value,
     value # backwards-compatibility, for now
   ) |>
@@ -47,7 +47,7 @@ d1_with_normalized <- d1 |>
   mutate(alpha_normalized = alpha / mean(abs(alpha)))
 
 write_csv(d1_with_normalized, 
-          "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_main.csv")
+          "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_SAII.csv")
 
 # vroom::vroom_write(d1_with_normalized, 
 #           "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera.csv.xz")

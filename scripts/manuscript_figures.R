@@ -18,9 +18,9 @@ omicronera_observation <- vroom::vroom("data-products/omicronera_observation.csv
 
 ## Population
 population <- tidycensus::get_decennial(geography = 'county', 
-                                 variables = 'P2_001N',
-                                 geometry = F,
-                                 year = 2020) |> 
+                                        variables = 'P2_001N',
+                                        geometry = F,
+                                        year = 2020) |> 
   mutate(fips = GEOID,
          population = value) |> 
   select(fips, population)
@@ -58,7 +58,7 @@ covidestim <- rbind(covidestim_week,
                     omicronera_week) |> 
   left_join(population) |> 
   mutate(infectionsPC_new = round((infections/population)*1e5, 2))
-  
+
 ## Fig.1 Patterns of synchronization
 fig1_data <- us_counties |> 
   left_join(covidestim,
@@ -320,9 +320,9 @@ fig1g
 
 library(patchwork)
 fig1 <- (fig1a/(((fig1b | fig1c | fig1d)+
-                  plot_layout(guides = 'collect'))/
+                   plot_layout(guides = 'collect'))/
                   ((fig1e | fig1f | fig1g)+
-                  plot_layout(guides = 'collect'))))+
+                     plot_layout(guides = 'collect'))))+
   plot_layout(heights = c(1,3))+
   plot_annotation(tag_levels = 'A')&
   theme(legend.position = "bottom")
@@ -498,63 +498,70 @@ ggsave(filename = "img/fig2a.png",
 
 ## Scatterplot to alphas
 ## Reading the weekly model output
-alphas_week <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_omicronera_main.csv")
+## function to build the joined alphas correctly
+joined_alphas <- \(alphas, date_col){
+  alphas <- alphas |> 
+    ## Writing the hexbin code as a 4-digit number
+    dplyr::mutate(hex_i = sprintf("%04d", i),
+           hex_j = sprintf("%04d", j)) |> 
+    ## Creating a 8-digit hexbin code to identifying uniquely them
+    dplyr::mutate(i_to_j = str_c(hex_i, hex_j),
+           j_to_i = str_c(hex_j, hex_i))
+  
+  ## Plotting
+  alphas_i_to_j <- alphas |> 
+    dplyr::group_by(i_to_j, 
+             {{ date_col }}) |> 
+    dplyr::summarise(raw = alpha,
+              normalized = alpha_normalized) 
+  # |>
+  #   mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
+  #   pivot_longer(cols = raw:standarlized,
+  #                names_to = "type",
+  #                values_to = "values")
+  
+  alphas_j_to_i <- alphas |> 
+    dplyr::group_by(j_to_i, 
+             {{ date_col }}) |> 
+    dplyr::summarise(raw = alpha,
+              normalized = alpha_normalized)
+  # |>
+  #   mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
+  #   pivot_longer(cols = raw:standarlized,
+  #                names_to = "type",
+  #                values_to = "values")
+  
+  joined_ij <- dplyr::inner_join(alphas_i_to_j, 
+                          alphas_j_to_i, 
+                          by = c("i_to_j" = "j_to_i", "date_week"), 
+                          suffix = c(".itoj", ".jtoi"))
+  return(joined_ij)
+}
 
-alphas_week <- alphas_week |> 
-  rename(alpha=interactionTerm, value=`(Intercept)`) |> 
-  separate(alpha, into = c("i", "j", "year", "month", "week"), sep = "-") |> 
-  transmute(
-    i, j,
-    date = glue("{year}-{month}-01") |> as.Date(),
-    week = glue("{week}") |> as.integer(),
-    alpha = value,
-    value # backwards-compatibility, for now
-  ) |>
-  # Creating a date using the month and week
-  mutate(date_week = floor_date(ymd(date) + (week - week(date))*7,
-                                unit = "week", 
-                                week_start = "Thursday"))
+## Alphas dataset
+## Pre-Omicron
+### Main model
+alphas_week_po_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_main.csv")
+### SAI model
+alphas_week_po_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAI.csv")
+### SAII model
+alphas_week_po_sa2 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAII.csv")
 
-alphas_week <- alphas_week |> 
-  mutate(i = as.integer(i),
-         j = as.integer(j)) |> 
-  ## Writing the hexbin code as a 4-digit number
-  mutate(hex_i = sprintf("%04d", i),
-         hex_j = sprintf("%04d", j)) |> 
-  ## Creating a 8-digit hexbin code to identifying uniquely them
-  mutate(i_to_j = str_c(hex_i, hex_j),
-         j_to_i = str_c(hex_j, hex_i))
+## Joined data.frames
+## Main
+joined_ij_week_po_main <- joined_alphas(alphas = alphas_week_po_main, 
+                                date_col = date_week)
+## SAI
+joined_ij_week_po_sa1 <- joined_alphas(alphas = alphas_week_po_sa1, 
+                                        date_col = date_week)
 
-## Plotting
-alphas_i_to_j_week <- alphas_week |> 
-  group_by(i_to_j, date_week) |> 
-  summarise(raw = alpha)
-  # summarise(raw = alpha,
-  #           normalized = alpha_normalized) |>
-  # mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
-  pivot_longer(cols = raw:standarlized,
-               names_to = "type",
-               values_to = "values")
+## SAII
+joined_ij_week_po_sa2 <- joined_alphas(alphas = alphas_week_po_sa2, 
+                                       date_col = date_week)
 
-alphas_j_to_i_week <- alphas_week |> 
-  group_by(j_to_i, date_week) |> 
-  summarise(raw = alpha,
-            normalized = alpha_normalized) |>
-  mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
-  pivot_longer(cols = raw:standarlized,
-               names_to = "type",
-               values_to = "values")
-
-joined_ij_week <- inner_join(alphas_i_to_j_week, 
-                             alphas_j_to_i_week, 
-                             by = c("i_to_j" = "j_to_i", 
-                                    "date_week", "type"), 
-                             suffix = c(".itoj", ".jtoi"))
-
-fig2b <- joined_ij_week |> 
-  filter(type == "raw") |> 
-  ggplot(aes(x = values.itoj, 
-             y = values.jtoi))+
+fig2b <- joined_ij_week_po_main |> 
+  ggplot(aes(x = raw.itoj, 
+             y = raw.jtoi))+
   geom_point(alpha = 0.01)+
   theme_minimal()+
   labs(x = expression(alpha["i,j"]),
@@ -566,8 +573,128 @@ fig2b <- joined_ij_week |>
         axis.text = element_text(size = 14))
 fig2b
 
-ggsave(filename = "img/fig2b_preomicron_SAII.png",
+ggsave(filename = "img/fig2b_preomicron_main.png",
        plot = fig2b,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+fig2c <- joined_ij_week_po_sa1 |> 
+  ggplot(aes(x = raw.itoj, 
+             y = raw.jtoi))+
+  geom_point(alpha = 0.01)+
+  theme_minimal()+
+  labs(x = expression(alpha["i,j"]),
+       y = expression(alpha["j,i"]), 
+       title = "Pre-Omicron SAI Model")+
+  # lims(x = c(-50,60), y = c(-50, 60))+
+  theme(legend.position = "none", 
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 14))
+fig2c
+
+ggsave(filename = "img/fig2c_preomicron_SAI.png",
+       plot = fig2c,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+fig2d <- joined_ij_week_po_sa2 |> 
+  ggplot(aes(x = raw.itoj, 
+             y = raw.jtoi))+
+  geom_point(alpha = 0.01)+
+  theme_minimal()+
+  labs(x = expression(alpha["i,j"]),
+       y = expression(alpha["j,i"]), 
+       title = "Pre-Omicron SAII Model")+
+  # lims(x = c(-50,60), y = c(-50, 60))+
+  theme(legend.position = "none", 
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 14))
+fig2d
+
+ggsave(filename = "img/fig2d_preomicron_SAII.png",
+       plot = fig2d,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+## Omicron-era
+### Main model
+alphas_week_oe_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_main.csv")
+### SAI model
+alphas_week_oe_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_SAI.csv")
+### SAII model
+alphas_week_oe_sa2 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_SAII.csv")
+
+## Joined data.frames
+## Main
+joined_ij_week_oe_main <- joined_alphas(alphas = alphas_week_oe_main, 
+                                        date_col = date_week)
+## SAI
+joined_ij_week_oe_sa1 <- joined_alphas(alphas = alphas_week_oe_sa1, 
+                                       date_col = date_week)
+
+## SAII
+joined_ij_week_oe_sa2 <- joined_alphas(alphas = alphas_week_oe_sa2, 
+                                       date_col = date_week)
+
+fig2e <- joined_ij_week_oe_main |> 
+  ggplot(aes(x = raw.itoj, 
+             y = raw.jtoi))+
+  geom_point(alpha = 0.01)+
+  theme_minimal()+
+  labs(x = expression(alpha["i,j"]),
+       y = expression(alpha["j,i"]), 
+       title = "Omicron-era Main Model")+
+  # lims(x = c(-50,60), y = c(-50, 60))+
+  theme(legend.position = "none", 
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 14))
+fig2e
+
+ggsave(filename = "img/fig2e_omicronera_main.png",
+       plot = fig2e,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+fig2f <- joined_ij_week_oe_sa1 |> 
+  ggplot(aes(x = raw.itoj, 
+             y = raw.jtoi))+
+  geom_point(alpha = 0.01)+
+  theme_minimal()+
+  labs(x = expression(alpha["i,j"]),
+       y = expression(alpha["j,i"]), 
+       title = "Omicron-era SAI Model")+
+  # lims(x = c(-50,60), y = c(-50, 60))+
+  theme(legend.position = "none", 
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 14))
+fig2f
+
+ggsave(filename = "img/fig2f_omicronera_SAI.png",
+       plot = fig2f,
+       width = 16,
+       height = 9, 
+       dpi = 100)
+
+fig2g <- joined_ij_week_oe_sa2 |> 
+  ggplot(aes(x = raw.itoj, 
+             y = raw.jtoi))+
+  geom_point(alpha = 0.01)+
+  theme_minimal()+
+  labs(x = expression(alpha["i,j"]),
+       y = expression(alpha["j,i"]), 
+       title = "Omicron-era SAII Model")+
+  # lims(x = c(-50,60), y = c(-50, 60))+
+  theme(legend.position = "none", 
+        axis.title = element_text(size = 14), 
+        axis.text = element_text(size = 14))
+fig2g
+
+ggsave(filename = "img/fig2g_omicronera_SAII.png",
+       plot = fig2g,
        width = 16,
        height = 9, 
        dpi = 100)

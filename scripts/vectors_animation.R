@@ -72,8 +72,8 @@ plot_and_save_frame <- function(week, dataset) {
                           guide = metR::guide_colorstrip(title.position = "top",
                                                          title.hjust = 0.5,
                                                          barwidth = grid::unit(12, "cm")))+
-    labs(tag = paste("Week:", week))+
-    theme(legend.position = "top")+
+    # labs(tag = paste("Week:", week))+
+    theme(legend.position = "none")+
     coord_sf(ylim = c(24,50), xlim = c(-124, -66))
   # plot
   
@@ -190,6 +190,18 @@ output_file <- "img/weekly_model_omicronera.gif"
 
 # Save the GIF animation
 magick::image_write(animation, output_file)
+  
+## Edge detection
+
+library(OpenImageR)
+
+image = readImage(frame_files[106])
+
+plot(raster::as.raster(image))
+
+res = edge_detection(image[,,1:3], method = 'LoG', conv_mode = 'same')
+
+plot(raster::as.raster(res))
 
 
 ## Whole thing
