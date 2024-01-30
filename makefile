@@ -55,7 +55,7 @@ $(counties)/mixedmodel/alphas.csv: scripts/regression.jl \
 	@mkdir -p $(counties)/mixedmodel
 	julia scripts/regression.jl \
 	  -o              $@ \
-	  --key           fips \
+	  --key           hexid \
 	  --neighbors     $(ds)/fips-neighbors.csv \
 	  --observations  $(dp)/covidestim-observations.csv \
 	  --predict       infectionsPC \
