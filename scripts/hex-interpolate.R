@@ -19,8 +19,12 @@ Options:
 
 ' -> doc
 
+### Load in the necessary libraries 
+### These are for the command line operation
 library(docopt)
 library(cli)
+
+### These are for the execution of the R code 
 suppressPackageStartupMessages( library(tidyverse) )
 suppressPackageStartupMessages( library(sf) )
 suppressPackageStartupMessages( library(geojsonio) )
@@ -31,9 +35,17 @@ args$exclude_threshold <- as.numeric(args$exclude_threshold) # Passed as string
 ps <- cli_process_start
 pd <- cli_process_done
 
+### Read in the details of the hexgrid 
+### Each hex is represented by an ID number. 
+### Each row represents a single hex and FIPs pair as well as the proportion
+### of that hex that the listed FIPS contributes (proportion from FIPs) and
+### the proportion (based on population) of the FIPs that the hex contains. 
+### These proportions are used as weights for allocating infections to hexes.
+
 ps("Reading {.file {args$hex_mapping}}")
 mapping <- read_csv(
   args$hex_mapping,
+  # "data-products/geo-hexes/hexid-fips-map.csv", ### for debugging 
   col_types = cols(
     hexid                = col_character(),
     fips                 = col_character(),
@@ -43,9 +55,12 @@ mapping <- read_csv(
 )
 pd()
 
+### Read in the covidestim generated data for each FIP 
+
 ps("Reading {.file {args$observations}}")
 observations <- read_csv(
   args$observations,
+  # "data-products/covidestim-observations.csv",
   col_types = cols(
     fips         = col_character(),
     date         = col_date(),
@@ -57,22 +72,30 @@ observations <- read_csv(
 )
 pd()
 
+### Read in the hex geometry 
 if (!is.null(args$geojson)) {
   ps("Reading {.file {args$geojson}}")
   geojson <- read_sf(args$geojson, quiet = T)
+  # geojson <- read_sf("data-products/geo-hexes/hexes.geojson", quiet = T)
   pd()
 }
 
+### Calculate the number of starting hexes 
 n_hexes_at_start <- length(unique(mapping$hexid))
 
+### Gather the counties in covidestim and hexgrid
 counties_present_in_covidestim <- unique(observations$fips)
 counties_present_in_mapping    <- unique(mapping$fips)
+### Gather the unique hexes in hexgrid
 hexids_present                 <- unique(mapping$hexid)
 
+### Gather the counties present both hexgrid and covidestim
 counties_present <- union(
   counties_present_in_covidestim,
   counties_present_in_mapping
 )
+
+### Calculate the fraction of missing counties that will be omitted from analysis
 
 local({
   counties_not_in_covidestim <- setdiff(
@@ -98,6 +121,7 @@ local({
   cli_li("{.emph {length(counties_not_in_mapping)}} counties are in Covidestim data but not in hex-mapping")
   cli_end()
 })
+
 
 ps("Calculating per-hex data missingness weighted by population")
 missingness_by_hex <- left_join(
@@ -131,10 +155,14 @@ ps("Filtering out hexes with greater than {.emph {args$exclude_threshold}%} popu
 approved_hexes <- filter(
   missingness_by_hex,
   proportion_of_hex_missing < I(args$exclude_threshold)/100
+  # proportion_of_hex_missing < I(50)/100 ### for debugging
 ) %>% pull(hexid)
 n_hexes_discarded <- nrow(missingness_by_hex) - length(approved_hexes)
 pd()
 cli_alert_warning("Discarded {.val {n_hexes_discarded}} / {.val {n_hexes_at_start}} hexes")
+
+### Assign each row (and hex/FIPS pair) the total cases, Rt, and infections
+### from covidestim observations for its associated associated county 
 
 result_uninterpolated <- mapping %>% filter(hexid %in% approved_hexes) %>%
   inner_join(observations, by = 'fips')
@@ -142,6 +170,11 @@ result_uninterpolated <- mapping %>% filter(hexid %in% approved_hexes) %>%
 ultimately_included_fips   <- unique(result_uninterpolated$fips)
 ultimately_included_hexids <- unique(result_uninterpolated$hexid)
 
+### This step is the critical step in which we distribute the infections 
+### from covidestim county data to the hex geometry. Here we aggregate so
+### hex has only one number per 
+### Note because a hex can have be part of more than one county, the sum of infections
+### of all hexes within a FIPS will not equal the number of infections for that FIPs. 
 ps("Interpolating hex observations from Covidestim observations")
 result <- result_uninterpolated %>%
   group_by(hexid, date) %>%
@@ -170,6 +203,9 @@ ultimately_excluded_fips <-
 ultimately_excluded_hexids <-
   setdiff(hexids_present, ultimately_included_hexids)
 
+### Create a GeoJSON which saves only those hexes which will not be used 
+### in the analysis
+
 if (!is.null(args$save_excluded)) {
   ps("Saving excluded fips+hexids report to {.file {args$save_excluded}}")
   write_csv(
@@ -185,6 +221,8 @@ if (!is.null(args$save_excluded)) {
   pd()
 }
 
+### Create a GeoJSON which saves only those hexes which will be used 
+### in the analysis
 if (!is.null(args$geojson) && !is.null(args$save_geojson)) {
   ps("Saving GeoJSON of participating hexes to {.file {args$save_geojson}}")
   geojson_write(
@@ -195,7 +233,7 @@ if (!is.null(args$geojson) && !is.null(args$save_geojson)) {
   )
   pd()
 }
-
+### Create a CSV which holds the infections distributed across hexes 
 ps("Saving interpolated observations to {.file {args$save_observations}}" )
 write_csv(result, args$save_observations)
 pd()
