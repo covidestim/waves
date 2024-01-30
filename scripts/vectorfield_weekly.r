@@ -44,7 +44,7 @@ neighbors <- read_csv(
 
 # ps("Reading {.file {args$alphas}}")
 alphas <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAII.csv",
   col_types = cols_only(
     i = col_character(), j = col_character(),
     date_week = col_date(),
@@ -188,10 +188,11 @@ features_from_wkt <- joined_vector_mean %>%
 # pd()
 
 ## Maybe we have to cast this object as LINESTRING from POINT geometry, instead of writing it manually
+# all.equal(unique(alphas$date_week), unique(features_from_wkt$date_week))
 
 # ps("Writing {.file {args$o}}")
 write_sf(features_from_wkt,
-         "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_omicronera.geojson",
+         "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_omicronera_main.geojson",
          append = F)
 
 # geojson_write(input = features_from_wkt,
