@@ -34,6 +34,10 @@ alphas_ij <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_rega
 hexid_observations <- vroom::vroom("data-products/geo-hexes/hexid-observations.csv") |> 
   filter(date == max(date))
 
+hexes_observations <- hexes |> 
+  mutate(hexid = as.double(hexid)) |> 
+  left_join(hexid_observations)
+
 edgelist <- vroom::vroom("data-products/geo-hexes/hexid-neighbors.csv")|>
   # ## Writing the hexbin code as a 4-digit number
   dplyr::mutate(hex_i = sprintf("%04d", i),
@@ -52,16 +56,18 @@ hexagon_matrix <- as.matrix(Matrix::sparseMatrix(i = sample_edgelist$i,
 samples_id_hexes <- c(1,5,11,6,21,33,20)
 samples_id_hexes <- c(1,5,11,6,21,33,20,10,32,48,64,49,34,12)
 samples_id_hexes <- c(1,5,11,6,21,33,20,10,32,48,64,49,34,12,19,47,63,79,96,80,65,78,95)
+samples_id_hexes <- 1:100
 samples_id_hexes <- 1:500
 samples_id_hexes <- 1:1000
+samples_id_hexes <- 1:10000
 
 samples_features <- features_preomicron |> 
-  # filter(i %in% samples_id_hexes) |> 
-  select(-alpha)
+  filter(i %in% samples_id_hexes) |>
+  filter(alpha>0)
 
 samples_alphas <- alphas_ij |> 
-  # filter(i %in% samples_id_hexes,
-  #        j %in% samples_id_hexes) |> 
+  filter(i %in% samples_id_hexes,
+         j %in% samples_id_hexes) |>
   filter(alpha>0)
 
 samples_hexes <- hexid_observations |> 
@@ -70,18 +76,19 @@ samples_hexes <- hexid_observations |>
          alpha = infectionsPC) |> 
   select(i_j, alpha)
 
-samples_features <- samples_features |> 
-  mutate(hexid = as.double(hexid)) |> 
-  left_join(samples_alphas |> 
-              select(i,j, alpha),
-            by = c("hexid" = "i"))
+# samples_features <- samples_features |> 
+#   mutate(hexid = as.double(hexid)) |> 
+#   left_join(samples_alphas |> 
+#               select(i,j, alpha),
+#             by = c("hexid" = "i"))
 
 samples_alphas <- samples_alphas |> 
   select(i,j,alpha)
 
 canny_alphas_edge <- canny_edge_detector(m = samples_alphas, 
-                                        low_threshold = 0.3, 
-                                        high_threshold = 0.7)
+                                         gaussian_kernel = '5x5',
+                                         low_threshold = 0.3, 
+                                         high_threshold = 0.7)
 
 ## Try to use quantile function
 ## low threshold = mean - sd, high threshold = mean + sd
@@ -92,8 +99,8 @@ canny_alphas_edge <- canny_edge_detector(m = samples_alphas,
 #                                         high_threshold = 0.7)
 
 canny_alphas_df <- data.frame(i = c(t(row(canny_alphas_edge))),
-                                  j = c(t(col(canny_alphas_edge))),
-                                  edge = c(t(canny_alphas_edge)))
+                              j = c(t(col(canny_alphas_edge))),
+                              edge = c(t(canny_alphas_edge)))
 
 canny_alphas <- inner_join(edgelist, canny_alphas_df)
 
@@ -108,17 +115,28 @@ plot_original <- hexes |>
   # geom_sf_text(data = hexes_centroid |>
   #                filter(hexid %in% samples_id_hexes),
   #         aes(label = hexid),
-  #         color = "gray50")+
-  geom_segment(data = samples_features,
-               aes(x = start_coord_x, xend = end_coord_x,
-                   y = start_coord_y, yend = end_coord_y,
-                   color = alpha),
-               arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
+  #         color = "gray50",
+  #         size = 12)+
+  geom_curve(data = samples_features,
+             aes(x = start_coord_x, xend = end_coord_x,
+                 y = start_coord_y, yend = end_coord_y,
+                 color = alpha),
+             arrow = grid::arrow(length = unit(x = 1, units = "mm"), type = "closed"))+
   # scale_fill_viridis_d(option = "rocket", direction = -1)+
-  scale_color_viridis_c(option = "rocket")+
-  theme_minimal()+
-  theme(axis.title = element_blank())+
-  labs(title = "Original")
+  scale_color_viridis_c(option = "rocket",
+                        name = "Alphas",
+                        breaks = pretty(samples_features$alpha, n = 10),
+                        oob = scales::squish,
+                        guide = metR::guide_colorstrip(title.position = "top",
+                                                       title.hjust = 0.5,
+                                                       barwidth = grid::unit(12, "cm")))+
+  theme_void()+
+  theme(axis.title = element_blank(), 
+        legend.position = "top")+
+  labs(title = "Original")+
+  guides(alpha = "none")+
+  coord_sf(xlim = sf::st_bbox(samples_features)[c(1,3)],
+           ylim = sf::st_bbox(samples_features)[c(2,4)])
 plot_original
 
 plot_edge <- hexes |> 
@@ -132,24 +150,234 @@ plot_edge <- hexes |>
   # geom_sf_text(data = hexes_centroid |>
   #                filter(hexid %in% samples_id_hexes),
   #              aes(label = hexid),
-  #              color = "gray50")+
-  geom_segment(data = samples_features |> 
-                 inner_join(canny_alphas) |> 
-                 filter(edge == TRUE),
-               aes(x = start_coord_x, xend = end_coord_x,
-                   y = start_coord_y, yend = end_coord_y,
-                   color = edge),
-               arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
+  #              color = "gray50",
+  #              size = 12)+
+  geom_curve(data = samples_features |> 
+               inner_join(canny_alphas) |> 
+               filter(edge == TRUE),
+             aes(x = start_coord_x, xend = end_coord_x,
+                 y = start_coord_y, yend = end_coord_y,
+                 color = edge),
+             arrow = grid::arrow(length = unit(x = 1, units = "mm"), type = "closed"))+
   # scale_fill_viridis_d(option = "rocket", direction = -1)+
   scale_color_viridis_d(option = "rocket")+
-  theme_minimal()+
+  theme_void()+
   theme(axis.title = element_blank())+
-  labs(title = "Edges")
+  labs(title = "Edges")+
+  guides(alpha = "none")+
+  coord_sf(xlim = sf::st_bbox(samples_features)[c(1,3)],
+           ylim = sf::st_bbox(samples_features)[c(2,4)])
 plot_edge
 
 library(patchwork)
 patchwork_edges <- (plot_original | plot_edge)
 patchwork_edges
+
+## New England Alpha Wave
+samples_id_ne <- 6972:7661
+dates_ne <- as.Date("2020-04-30")
+
+ne_observations <-  vroom::vroom("data-products/geo-hexes/hexid-observations.csv") |> 
+  filter(as.integer(hexid) %in% samples_id_ne,
+         date > "2020-03-01" & date < "2020-09-01") |> 
+  mutate(date_week = floor_date(date, week_start = "Thursday", unit = "week")) |> 
+  reframe(infectionsPC = sum(infectionsPC),
+          .by = c("hexid", "date_week"))
+
+ne_observations |> 
+  group_by(date_week) |> 
+  summarise(infectionsPC = sum(infectionsPC)) |> 
+  ggplot(aes(date_week, infectionsPC))+
+  geom_line()+
+  theme_minimal()
+
+ne_hexes <- hexes |> 
+  filter(as.integer(hexid) %in% samples_id_ne) 
+
+ne_bbox <- sf::st_bbox(ne_hexes)
+
+ne_infections <- ne_hexes |> 
+  mutate(hexid = as.double(hexid)) |> 
+  left_join(ne_observations)
+
+ne_hexid <- hexes_centroid |> 
+  filter(as.integer(hexid) %in% samples_id_ne)
+
+## Canny edge detector
+## New England Alpha Wave
+samples_id_ne <- 6972:7661
+# dates_ne <- as.Date("2020-04-30")
+date_ne <- as.Date("2020-04-09")
+
+ne_observations <-  vroom::vroom("data-products/geo-hexes/hexid-observations.csv") |> 
+  filter(as.integer(hexid) %in% samples_id_ne) |> 
+  mutate(date_week = floor_date(date, week_start = "Thursday", unit = "week")) |> 
+  reframe(infectionsPC = sum(infectionsPC),
+          .by = c("hexid", "date_week"))
+
+ne_observations |> 
+  group_by(date_week) |> 
+  summarise(infectionsPC = sum(infectionsPC)) |> 
+  ggplot(aes(date_week, infectionsPC))+
+  geom_line()+
+  theme_minimal()
+
+ne_hexes <- hexes |> 
+  filter(as.integer(hexid) %in% samples_id_ne) 
+
+ne_bbox <- sf::st_bbox(ne_hexes)
+
+ne_infections <- ne_hexes |> 
+  mutate(hexid = as.double(hexid)) |> 
+  left_join(ne_observations)
+
+ne_hexid <- hexes_centroid |> 
+  filter(as.integer(hexid) %in% samples_id_ne)
+
+ne_features <- sf::st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_preomicron_SAII.geojson") |>
+  dplyr::mutate(j = as.double(j)) |>
+  dplyr::inner_join(edgelist) |>
+  dplyr::filter(alpha == max(alpha, na.rm = T),
+                .by = c(i,j, date_week)) |>
+  filter(i %in% samples_id_ne,
+         j %in% samples_id_ne) |> 
+  dplyr::filter(date_week == date_ne)
+
+ne_alphas <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAII.csv") |> 
+  # dplyr::select(i,j,date_week, alpha) |>
+  # ## Writing the hexbin code as a 4-digit number
+  # dplyr::mutate(hex_i = sprintf("%04d", i),
+  #               hex_j = sprintf("%04d", j)) |>
+  # ## Creating a 8-digit hexbin code to identifying uniquely them
+  # dplyr::mutate(i_j = str_c(hex_i, hex_j)) |>
+  dplyr::filter(date_week == date_ne) |> 
+  # dplyr::filter(alpha == max(alpha, na.rm = T),
+  #               .by = c(i,j, date_week)) |> 
+  filter(i %in% samples_id_ne,
+         j %in% samples_id_ne)
+
+ne_features <- ne_features |>
+  filter(alpha>0)
+
+ne_alphas <- ne_alphas |> 
+  filter(alpha>0) |> 
+  select(i,j,alpha)
+
+ne_canny_edges <- canny_edge_detector(m = ne_alphas, 
+                                      gaussian_kernel = '3x3',
+                                      low_threshold = 0.3, 
+                                      high_threshold = 0.7)
+
+ne_canny_df <- data.frame(i = c(t(row(ne_canny_edges))),
+                          j = c(t(col(ne_canny_edges))),
+                          edge = c(t(ne_canny_edges)))
+
+ne_canny_alphas <- inner_join(edgelist, ne_canny_df)
+
+plot_infections_ne <- ggplot()+
+  geom_sf(data = ne_hexes, 
+          fill = "transparent",
+          size = 0.1)+
+  geom_sf(data = ne_infections |> 
+            filter(date_week == date_ne),
+          aes(fill = infectionsPC),
+          size = 0.1)+
+  theme_void()+
+  scale_fill_viridis_c(option = "rocket",
+                       # midpoint = 600,
+                       direction = -1,
+                       name = "Infections per capita",
+                       breaks = seq(0,5000, 500),
+                       labels = c(seq(0,4500, 500), "5000+"),
+                       limits = c(0,5000),
+                       oob = scales::squish,
+                       guide = metR::guide_colorstrip(title.position = "top",
+                                                      title.hjust = 0.5,
+                                                      barwidth = grid::unit(12, "cm")))+
+  theme(legend.position = "top")+
+  labs(tag = date_ne)
+plot_infections_ne
+
+plot_vectors_ne <- ne_infections |> 
+  ggplot()+
+  geom_sf(size = 0.1)+
+  geom_segment(data = ne_features,
+               aes(x = start_coord_x, xend = end_coord_x,
+                   y = start_coord_y, yend = end_coord_y,
+                   color = alpha),
+               arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
+  theme_void()+
+  scale_color_viridis_b(option = "rocket",
+                        direction = -1,
+                        name = "Alphas",
+                        breaks = pretty(ne_features$alpha, n = 10),
+                        # oob = scales::squish,
+                        guide = metR::guide_colorstrip(title.position = "top",
+                                                       title.hjust = 0.5,
+                                                       barwidth = grid::unit(12, "cm")))+
+  theme(legend.position = "top")
+plot_vectors_ne
+
+plot_edge_ne <- ne_infections |> 
+  ggplot()+
+  geom_sf(size = 0.1)+
+  geom_segment(data = ne_features |> 
+                 inner_join(ne_canny_alphas) |> 
+                 filter(edge==T),
+               aes(x = start_coord_x, xend = end_coord_x,
+                   y = start_coord_y, yend = end_coord_y,
+                   color = edge),
+               arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
+  scale_color_viridis_d(option = "rocket")+
+  theme_void()+
+  theme(axis.title = element_blank(), 
+        legend.position = "none")+
+  labs(title = "Edges")
+plot_edge_ne
+
+library(patchwork)
+patchwork_edges_ne <- (plot_infections_ne| plot_vectors_ne | plot_edge_ne)
+patchwork_edges_ne
+
+LT <- seq(0.1,0.9, 0.1)
+HT <- 1
+
+ne_canny_list <- list()
+ne_plot_edge_list <- list()
+
+for (i in 1:length(LT)) {
+  ne_canny_edges <- canny_edge_detector(m = ne_alphas, 
+                                        gaussian_kernel = '5x5',
+                                        low_threshold = LT[i], 
+                                        high_threshold = HT)
+  
+  ne_canny_df <- data.frame(i = c(t(row(ne_canny_edges))),
+                            j = c(t(col(ne_canny_edges))),
+                            edge = c(t(ne_canny_edges)))
+  
+  ne_canny_list[[i]] <- inner_join(edgelist, ne_canny_df)
+  
+  ne_plot_edge_list[[i]] <- ne_infections |> 
+    ggplot()+
+    geom_sf(size = 0.1)+
+    geom_segment(data = ne_features |> 
+                   inner_join(ne_canny_list[[i]]) |> 
+                   filter(edge == TRUE),
+                 aes(x = start_coord_x, xend = end_coord_x,
+                     y = start_coord_y, yend = end_coord_y,
+                     color = edge),
+                 arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
+    scale_color_viridis_d(option = "rocket")+
+    theme_void()+
+    theme(axis.title = element_blank(), 
+          legend.position = "none")+
+    labs(title = paste0("Edges, LT = ", LT[i], " and HT = ", HT))
+}
+
+patchwork_LT <- ((ne_plot_edge_list[[1]] | ne_plot_edge_list[[2]] | ne_plot_edge_list[[3]])/
+                   (ne_plot_edge_list[[4]] | ne_plot_edge_list[[5]] | ne_plot_edge_list[[6]])/
+                   (ne_plot_edge_list[[7]] | ne_plot_edge_list[[8]] | ne_plot_edge_list[[9]]))
+patchwork_LT
 
 # |>
 #   # filtering to only show alphas >0, 
