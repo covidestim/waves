@@ -14,23 +14,6 @@ hexes_centroid <- sf::st_centroid(hexes)
 
 hexes_boundary <- sf::st_union(hexes)
 
-# ## Pre-Omicron
-features_preomicron <- sf::st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_preomicron_SAII.geojson") |>
-  dplyr::filter(date_week == max(date_week)) |> 
-  dplyr::filter(alpha == max(alpha, na.rm = T),
-                .by = c(j, date_week))
-
-alphas_ij <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAII.csv") |> 
-  # dplyr::select(i,j,date_week, alpha) |>
-  # ## Writing the hexbin code as a 4-digit number
-  dplyr::mutate(hex_i = sprintf("%04d", i),
-                hex_j = sprintf("%04d", j)) |>
-  # ## Creating a 8-digit hexbin code to identifying uniquely them
-  dplyr::mutate(i_j = str_c(hex_i, hex_j)) |>
-  dplyr::filter(date_week == max(date_week)) |> 
-  dplyr::filter(alpha == max(alpha, na.rm = T),
-                .by = c(i_j, date_week))
-
 hexid_observations <- vroom::vroom("data-products/geo-hexes/hexid-observations.csv") |> 
   filter(date == max(date))
 
@@ -43,14 +26,28 @@ edgelist <- vroom::vroom("data-products/geo-hexes/hexid-neighbors.csv")|>
   dplyr::mutate(hex_i = sprintf("%04d", i),
                 hex_j = sprintf("%04d", j)) |>
   # ## Creating a 8-digit hexbin code to identifying uniquely them
-  dplyr::mutate(i_j = str_c(i, ",", j)) 
+  dplyr::mutate(i_j = str_c(i, ",", j))
 
-sample_edgelist <- edgelist |> 
-  filter(i %in% samples_id_hexes)
+# ## Pre-Omicron
+features_preomicron <- sf::st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_preomicron_SAII.geojson") |>
+  # dplyr::filter(date_week == max(date_week)) |> 
+  dplyr::filter(alpha == max(alpha, na.rm = T),
+                .by = c(j, date_week))
 
-hexagon_matrix <- as.matrix(Matrix::sparseMatrix(i = sample_edgelist$i, 
-                                                 j = sample_edgelist$j, 
-                                                 x = sample_edgelist$i_j))
+features_preomicron <- features_preomicron |> 
+  mutate(j = as.double(j)) |> 
+  left_join(edgelist)
+
+alphas_ij <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAII.csv") |> 
+  # dplyr::select(i,j,date_week, alpha) |>
+  # ## Writing the hexbin code as a 4-digit number
+  dplyr::mutate(hex_i = sprintf("%04d", i),
+                hex_j = sprintf("%04d", j)) |>
+  # ## Creating a 8-digit hexbin code to identifying uniquely them
+  dplyr::mutate(i_j = str_c(hex_i, hex_j)) |>
+  # dplyr::filter(date_week == max(date_week)) |> 
+  dplyr::filter(alpha == max(alpha, na.rm = T),
+                .by = c(i_j, date_week))
 
 # samples_id_hexes <- c(6,21,49,80,1,11,33,64,96,5,20,48,79,10,32,63,95,12,34,65,19,47,78)
 samples_id_hexes <- c(1,5,11,6,21,33,20)
@@ -61,8 +58,11 @@ samples_id_hexes <- 1:500
 samples_id_hexes <- 1:1000
 samples_id_hexes <- 1:10000
 
+sample_edgelist <- edgelist |> 
+  filter(i %in% samples_id_hexes)
+
 samples_features <- features_preomicron |> 
-  filter(i %in% samples_id_hexes) |>
+  filter(j %in% samples_id_hexes) |>
   filter(alpha>0)
 
 samples_alphas <- alphas_ij |> 
@@ -117,7 +117,9 @@ plot_original <- hexes |>
   #         aes(label = hexid),
   #         color = "gray50",
   #         size = 12)+
-  geom_curve(data = samples_features,
+  geom_curve(data = samples_features |> 
+               filter(date_week == "2020-04-09",
+                      alpha > 0),
              aes(x = start_coord_x, xend = end_coord_x,
                  y = start_coord_y, yend = end_coord_y,
                  color = alpha),
