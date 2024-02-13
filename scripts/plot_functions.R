@@ -100,3 +100,45 @@ plt_omicronera <- \(week, dataset, hexes, plot_img = TRUE) {
   # Return the temporary file path
   return(tmp_file)
 }
+
+## Scatterplot to alphas
+## Reading the weekly model output
+## function to build the joined alphas correctly
+joined_alphas <- \(alphas, date_col){
+  alphas <- alphas |> 
+    ## Writing the hexbin code as a 4-digit number
+    dplyr::mutate(hex_i = sprintf("%04d", i),
+                  hex_j = sprintf("%04d", j)) |> 
+    ## Creating a 8-digit hexbin code to identifying uniquely them
+    dplyr::mutate(i_to_j = str_c(hex_i, hex_j),
+                  j_to_i = str_c(hex_j, hex_i))
+  
+  ## Plotting
+  alphas_i_to_j <- alphas |> 
+    dplyr::group_by(i_to_j, 
+                    {{ date_col }}) |> 
+    dplyr::summarise(raw = alpha,
+                     normalized = alpha_normalized) 
+  # |>
+  #   mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
+  #   pivot_longer(cols = raw:standarlized,
+  #                names_to = "type",
+  #                values_to = "values")
+  
+  alphas_j_to_i <- alphas |> 
+    dplyr::group_by(j_to_i, 
+                    {{ date_col }}) |> 
+    dplyr::summarise(raw = alpha,
+                     normalized = alpha_normalized)
+  # |>
+  #   mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
+  #   pivot_longer(cols = raw:standarlized,
+  #                names_to = "type",
+  #                values_to = "values")
+  
+  joined_ij <- dplyr::inner_join(alphas_i_to_j, 
+                                 alphas_j_to_i, 
+                                 by = c("i_to_j" = "j_to_i", "date_week"), 
+                                 suffix = c(".itoj", ".jtoi"))
+  return(joined_ij)
+}
