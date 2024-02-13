@@ -30,7 +30,7 @@ edgelist <- vroom::vroom("data-products/geo-hexes/hexid-neighbors.csv")|>
 
 # ## Pre-Omicron
 features_preomicron <- sf::st_read("data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_preomicron_SAII.geojson") |>
-  # dplyr::filter(date_week == max(date_week)) |> 
+  dplyr::filter(date_week == max(date_week)) |>
   dplyr::filter(alpha == max(alpha, na.rm = T),
                 .by = c(j, date_week))
 
@@ -45,7 +45,7 @@ alphas_ij <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_rega
                 hex_j = sprintf("%04d", j)) |>
   # ## Creating a 8-digit hexbin code to identifying uniquely them
   dplyr::mutate(i_j = str_c(hex_i, hex_j)) |>
-  # dplyr::filter(date_week == max(date_week)) |> 
+  dplyr::filter(date_week == max(date_week)) |>
   dplyr::filter(alpha == max(alpha, na.rm = T),
                 .by = c(i_j, date_week))
 
@@ -56,6 +56,7 @@ samples_id_hexes <- c(1,5,11,6,21,33,20,10,32,48,64,49,34,12,19,47,63,79,96,80,6
 samples_id_hexes <- 1:100
 samples_id_hexes <- 1:500
 samples_id_hexes <- 1:1000
+samples_id_hexes <- 1:2500
 samples_id_hexes <- 1:10000
 
 sample_edgelist <- edgelist |> 
@@ -104,8 +105,37 @@ canny_alphas_df <- data.frame(i = c(t(row(canny_alphas_edge))),
 
 canny_alphas <- inner_join(edgelist, canny_alphas_df)
 
-plot_original <- hexes |> 
-  filter(hexid %in% samples_id_hexes) |>
+plot_infections <- ggplot()+
+  geom_sf(data = hexes_observations |> 
+            # filter(as.integer(hexid) < 7662) |> 
+            filter(hexid %in% samples_id_hexes) |> 
+            sf::st_as_sf(),
+          aes(fill = infectionsPC),
+          size = 3)+
+  geom_sf_text(data = hexes_centroid |>
+                 filter(hexid %in% samples_id_hexes),
+               aes(label = hexid),
+               color = "gray50",
+               size = 12)+
+  scale_fill_viridis_c(option = "rocket",
+                       name = "Infections PC",
+                       breaks = seq(0,1000, 100),
+                       labels = c(seq(0,900, 100), "1000+"),
+                       limits = c(0,1000),
+                       oob = scales::squish,
+                       guide = metR::guide_colorstrip(title.position = "left",
+                                                      title.hjust = 0.5,
+                                                      barheight = grid::unit(12, "cm")))+
+  theme_void()+
+  theme(axis.title = element_blank(), 
+        legend.position = "left",
+        legend.title = element_text(angle = 90))+
+  labs(title = "Infections")+
+  guides(alpha = "none")
+plot_infections
+
+plot_alphas <- hexes |> 
+  filter(as.integer(hexid) < 7662) |> 
   sf::st_as_sf() |> 
   # mutate(hexid = as.double(hexid)) |>
   # left_join(canny_alphas,
@@ -118,31 +148,29 @@ plot_original <- hexes |>
   #         color = "gray50",
   #         size = 12)+
   geom_curve(data = samples_features |> 
-               filter(date_week == "2020-04-09",
-                      alpha > 0),
+               filter(alpha >= 100),
              aes(x = start_coord_x, xend = end_coord_x,
                  y = start_coord_y, yend = end_coord_y,
                  color = alpha),
-             arrow = grid::arrow(length = unit(x = 1, units = "mm"), type = "closed"))+
+             arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
   # scale_fill_viridis_d(option = "rocket", direction = -1)+
   scale_color_viridis_c(option = "rocket",
                         name = "Alphas",
                         breaks = pretty(samples_features$alpha, n = 10),
                         oob = scales::squish,
-                        guide = metR::guide_colorstrip(title.position = "top",
+                        guide = metR::guide_colorstrip(title.position = "left",
                                                        title.hjust = 0.5,
-                                                       barwidth = grid::unit(12, "cm")))+
+                                                       barheight = grid::unit(10, "cm")))+
   theme_void()+
   theme(axis.title = element_blank(), 
-        legend.position = "top")+
-  labs(title = "Original")+
-  guides(alpha = "none")+
-  coord_sf(xlim = sf::st_bbox(samples_features)[c(1,3)],
-           ylim = sf::st_bbox(samples_features)[c(2,4)])
-plot_original
+        legend.position = "left",
+        legend.title = element_text(angle = 90))+
+  labs(title = "Alphas")+
+  guides(alpha = "none")
+plot_alphas
 
 plot_edge <- hexes |> 
-  filter(hexid %in% samples_id_hexes) |>
+  filter(as.integer(hexid) < 7662) |> 
   sf::st_as_sf() |> 
   # mutate(hexid = as.double(hexid)) |>
   # left_join(canny_alphas,
@@ -160,19 +188,18 @@ plot_edge <- hexes |>
              aes(x = start_coord_x, xend = end_coord_x,
                  y = start_coord_y, yend = end_coord_y,
                  color = edge),
-             arrow = grid::arrow(length = unit(x = 1, units = "mm"), type = "closed"))+
+             arrow = grid::arrow(length = unit(x = 1.2, units = "mm"), type = "closed"))+
   # scale_fill_viridis_d(option = "rocket", direction = -1)+
   scale_color_viridis_d(option = "rocket")+
   theme_void()+
-  theme(axis.title = element_blank())+
+  theme(axis.title = element_blank(),
+        legend.position = "none")+
   labs(title = "Edges")+
-  guides(alpha = "none")+
-  coord_sf(xlim = sf::st_bbox(samples_features)[c(1,3)],
-           ylim = sf::st_bbox(samples_features)[c(2,4)])
+  guides(alpha = "none")
 plot_edge
 
 library(patchwork)
-patchwork_edges <- (plot_original | plot_edge)
+patchwork_edges <- (plot_infections/ plot_alphas)
 patchwork_edges
 
 ## New England Alpha Wave
