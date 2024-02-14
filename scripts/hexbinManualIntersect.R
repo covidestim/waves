@@ -251,7 +251,6 @@ ggplot() + geom_sf(tempPopTrans, mapping=aes(fill=population)) +
 #### First show it works for one date 
 ###############################################################################
 ### Validate that the infections and hexgrid are compatible 
-hexgrid <- hexgrid %>% rename("geometry" = x)
 hexgrid <- st_transform(hexgrid, crs = 26915)
 
 areal::ar_validate(observationFips, hexgrid, 
@@ -291,8 +290,11 @@ ggplot() + geom_sf(tempInfAreaTrans, mapping=aes(fill=infections)) +
 
 ### Create infections per capita
 hexObservations <- full_join(tempInfAreaTib, tempPopTib, by="hexid") %>% 
-  mutate(infectionsPC = infections/population)
-
+  filter(is.na(infections) == FALSE, is.na(population) == FALSE) %>%
+  mutate(infections = ifelse (population >= infections, infections, population),
+         infectionsPC = ifelse(population==0, 0, infections/population*1e5)) 
+  
+range(hexObservations$infectionsPC)
 
 ###############################################################################
 ##### Now create dataframe to hold hex infections for all dates 
@@ -331,7 +333,8 @@ tempInfAreaAll$date <- as.Date(tempInfAreaAll$date, origin='1970-01-01')
 ### Need to remove the first row of the InfAreaAll dataframe because it was 
 ### for formatting only. 
 hexObservationsAll <- full_join(InfAreaAll[-1,], tempPop, by="hexid") %>% 
-  mutate(infectionsPC = ifelse(population == 0, 0, infections/population), 
+  mutate(infections = ifelse (population >= infections, infections, population),
+         infectionsPC = ifelse(population == 0, 0, infections/population), 
          date = as.Date(date, origin='1970-01-01')) %>% 
   rename(geometry = x)
 
@@ -344,6 +347,7 @@ ggplot() + geom_sf(hexObservationsAllSF %>% filter(date == testDate),
   scale_fill_gradient(low = "thistle1", high = "deeppink4") + 
   geom_sf(hexObservationsAllSF %>% filter(infections == 0), 
           mapping=aes(), fill="green")
+
 ###############################################################################
 ###### Save to a CSV 
 ###############################################################################
