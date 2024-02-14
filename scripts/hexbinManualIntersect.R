@@ -14,6 +14,8 @@ args$hexsize <- 25
 args$cbg_polygons <- "data-sources/cbg-polygons/cb_2019_us_bg_500k.shp"
 args$cbg_popsize <- "data-sources/cbg_popsize.csv"
 args$lower_48 <- T
+### This argument is set to control which dataset to use and names to save files
+args$modelVersion <- "preomicron"
 
 # The TopoJSON file is read in, the counties layer is selected, then the data
 # is converted to a `sf`. Some of these geometries are invalid because of how
@@ -164,23 +166,28 @@ cbgpop <- st_transform(cbgpop, crs = 26915)
 
 
 ### Create observations at a FIPS level.
-observations <- read_csv(
-  "data-products/covidestim-observations.csv",
-  col_types = cols(
-    fips         = col_character(),
-    date         = col_date(),
-    cases        = col_number(),
-    Rt           = col_number(),
-    infections   = col_number(),
-    infectionsPC = col_number()
+if(args$modelVersion == "preomicron"){
+  observations <- read_csv(
+    "data-products/covidestim-observations.csv",
+    col_types = cols(
+      fips         = col_character(),
+      date         = col_date(),
+      cases        = col_number(),
+      Rt           = col_number(),
+      infections   = col_number(),
+      infectionsPC = col_number()
+    )
   )
-)
+  #### Also set a test date for the plots throughout the workflow
+  testDate <- "2020-07-26"
+} else {
+  observations <- read_csv(
+    "data-products/omicron_estimates.csv") %>% 
+    select(fips, date, infections)
+  #### Also set a test date for the plots throughout the workflow
+  testDate <- "2021-11-04"
+}
 
-observationsOmicron <- read_csv(
-  "data-products/omicron_estimates.csv") %>% 
-  select(fips, date, infections)
-
-observations <- observationsOmicron
 ### join with county geometries from above 
 counties$fips <- counties$id
 observationFips <- left_join(counties, observations, by = 'fips')
@@ -188,22 +195,17 @@ observationFips <- left_join(counties, observations, by = 'fips')
 observationFips <- st_as_sf(observationFips)
 observationFips <- st_transform(observationFips, crs = 26915)
 
-### Pre-Omicron 
-ggplot() + geom_sf(observationFips %>% filter(date == "2020-07-26"), 
+### Explore with a plot
+ggplot() + geom_sf(observationFips %>% filter(date == testDate), 
                    mapping=aes(fill=infections)) + 
   theme_minimal() + 
   scale_fill_gradient(low = "thistle1", high = "deeppink4")
 
-### Omicron 
-ggplot() + geom_sf(observationFips %>% filter(date == "2021-11-04"), 
-                   mapping=aes(fill=infections)) + 
-  theme_minimal() + 
-  scale_fill_gradient(low = "thistle1", high = "deeppink4")
 ###############################################################################
 ################## FIRST: AREA WEIGHTED POPULATION TO HEXES ###################
-##### SECOND: USE HEX POPULATIONS AS WEIGHTS FOR INFECTION INTERPOLATION ######
+################## SECOND: AREA WEIGHTED INFECTION TO HEXES ###################
 ##### THIRD: JOIN THE POP AND INFECTIONS ACROSS HEXES. CALCULATE ##############
-############## INFECTIONS PER CAPITA ############## ############## #############
+########################### INFECTIONS PER CAPITA #############################
 ###############################################################################
 
 ###############################################################################
@@ -219,7 +221,7 @@ tempPop <- areal::aw_interpolate(
   tid = hexid,
   source = cbgpop,
   sid = GEOID,
-  weight = "total",
+  weight = "sum",
   output =  "sf",
   extensive = "population"
 )
@@ -230,7 +232,7 @@ tempPopTib <- areal::aw_interpolate(
   tid = hexid,
   source = cbgpop,
   sid = GEOID,
-  weight = "total",
+  weight = "sum",
   output =  "tibble",
   extensive = "population"
 )
@@ -260,11 +262,9 @@ areal::ar_validate(observationFips, hexgrid,
 tempInfArea <- areal::aw_interpolate(
   hexgrid,
   tid = hexid,
-  source = observationFips %>% select(id, name, fips, date, infections, geometry) %>% filter(date == "2020-04-26"),
-  
-  # source = observationFips %>% select(id, name, fips, date, infections, geometry) %>% filter(date == "2021-11-04"),
+  source = observationFips %>% select(id, name, fips, date, infections, geometry) %>% filter(date == testDate),
   sid = fips,
-  weight = "total",
+  weight = "sum",
   output =  "sf",
   extensive = "infections"
 )
@@ -273,30 +273,29 @@ tempInfArea <- areal::aw_interpolate(
 tempInfAreaTib <- areal::aw_interpolate(
   hexgrid,
   tid = hexid,
-  source = observationFips %>% select(id, name, fips, date, infections, geometry) %>% filter(date == "2020-04-26"),
-  # source = observationFips %>% select(id, name, fips, date, infections, geometry) %>% filter(date == "2021-11-04"),
+  source = observationFips %>% select(id, name, fips, date, infections, geometry) %>% filter(date == testDate),
   sid = fips,
-  weight = "total",
+  weight = "sum",
   output =  "tibble",
   extensive = "infections"
 )
 
 ### Transform back to the projection of interest for plotting
 tempInfAreaTrans <- st_transform(tempInfArea, crs = 4269)
-tempInfAreaTrans$hexid <- as.numeric(tempInfAreaTrans$hexid) ### used for filtering
+
 ### Plot the population across the hexes 
 ggplot() + geom_sf(tempInfAreaTrans, mapping=aes(fill=infections)) + 
   scale_fill_gradient(low = "thistle1", high = "deeppink4") + 
   geom_sf(tempInfAreaTrans %>% filter(infections == 0), mapping=aes(), fill="green")
 
 
-##### Create infections per capita #####
+### Create infections per capita
 hexObservations <- full_join(tempInfAreaTib, tempPopTib, by="hexid") %>% 
   mutate(infectionsPC = infections/population)
 
 
 ###############################################################################
-##### Now create it for all dates 
+##### Now create dataframe to hold hex infections for all dates 
 ###############################################################################
 
 InfAreaAll <- data.frame(hexid = 0,
@@ -314,7 +313,7 @@ for (i in 1:length(unique(observationFips$date))){
       select(id, name, fips, date, infections, geometry) %>% 
       filter(date == filtDate),
     sid = fips,
-    weight = "total",
+    weight = "sum",
     output =  "tibble",
     extensive = "infections"
   )
@@ -326,38 +325,45 @@ for (i in 1:length(unique(observationFips$date))){
 #### Reformat the date
 tempInfAreaAll$date <- as.Date(tempInfAreaAll$date, origin='1970-01-01')
 
-##### Create infections per capita #####
-##### Need to remove the first row of the InfAreaAll dataframe because it was 
-##### for formatting only. 
+###############################################################################
+##### Create infections per capita 
+###############################################################################
+### Need to remove the first row of the InfAreaAll dataframe because it was 
+### for formatting only. 
 hexObservationsAll <- full_join(InfAreaAll[-1,], tempPop, by="hexid") %>% 
   mutate(infectionsPC = ifelse(population == 0, 0, infections/population), 
          date = as.Date(date, origin='1970-01-01')) %>% 
   rename(geometry = x)
 
-##### Create an SF version for plots 
+### Create an SF version for plots 
 hexObservationsAllSF <- st_as_sf(hexObservationsAll)
 
-##### Check with a plot 
-ggplot() + geom_sf(hexObservationsAllSF %>% filter(date == "2020-04-26"), mapping=aes(fill=infections)) + 
+### Check with a plot 
+ggplot() + geom_sf(hexObservationsAllSF %>% filter(date == testDate), 
+                   mapping=aes(fill=infections)) + 
   scale_fill_gradient(low = "thistle1", high = "deeppink4") + 
-  geom_sf(hexObservationsAllSF %>% filter(infections == 0), mapping=aes(), fill="green")
-
-### Save to a CSV 
+  geom_sf(hexObservationsAllSF %>% filter(infections == 0), 
+          mapping=aes(), fill="green")
+###############################################################################
+###### Save to a CSV 
+###############################################################################
+### Ensure the right types 
 hexObsPreOm$hexid <- as.character(hexObsPreOm$hexid)
 hexObsPreOm$infections <- as.numeric(hexObsPreOm$infections)
 hexObsPreOm$infectionsPC <- as.numeric(hexObsPreOm$infectionsPC)
-#### Remove missings 
+### Remove missing values for infectionsPC 
 hexObsPreOmNoMissing <- hexObsPreOm %>% filter(is.na(infectionsPC) == FALSE)
-### remove the unnecessary columns of geometry and population
+### Remove the unnecessary columns of geometry and population
 hexObsPreOmNoMissing <- hexObsPreOmNoMissing[,-c(4:5)] 
 
 write_csv(hexObsPreOmNoMissing, 
-          file = "data-products/geo-hexes/hexid-observations_preomicronNEW.csv")
-
-### Save an SF for plots 
+          file = paste0("data-products/geo-hexes/hexid-observations_", args$modelVersion, ".csv"))
+###############################################################################
+###### Save an SF for plots 
+###############################################################################
 geojson_write(
   hexObservationsAllSF,
   geometry  = "polygon",
-  file      = "data-products/geo-hexes/hexid-observations_OmicronNEW.geojson",
+  file      = paste0("data-products/geo-hexes/hexid-observations_", args$modelVersion, ".geojson"),
   overwrite = T,
 )
