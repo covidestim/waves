@@ -24,8 +24,8 @@ results = CSV.read(
   types=Dict(
     geosym        => String,
     :date         => Date,
-    :cases        => Float64,
-    :Rt           => Float64,
+    #:cases        => Float64,
+    #:Rt           => Float64,
     :infections   => Float64,
     :infectionsPC => Float64
   )
@@ -102,12 +102,11 @@ transform!(joined, [:i, :j, :date] =>
 ## Main analysis model:
 ## outcome_i ~ (1|interactionTerm) + outcome_j_1 + outcome_j_2 + outcome_i_1
 formula_main = @formula(outcome_i ~ 0 + (1 | interactionTerm) + 
-      # Lags (fixed effects)
-      outcome_j_7 +
-      outcome_j_14 +
-      outcome_j_21 +
-      # Autocorr (fixed effect)
-      outcome_i_7)
+    # Lags (fixed effects)
+    outcome_j_7 +
+    outcome_j_14 +
+    outcome_j_21
+)
 
 print(formula_main)
 
@@ -122,7 +121,7 @@ effects_main = DataFrame(only(raneftables(model_main)))
 print(effects_main)
 
 ## Writing alphas .csv
-CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_main.csv", effects_main)
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_preomicron_mainNEW.csv", effects_main)
 
 ## Sensitivity Analysis I (SAI) analysis model:
 ## outcome_i ~ (1|interactionTerm) + outcome_j_1 + outcome_j_2 + outcome_i_1 + outcome_i_2 + outcome_i_3
@@ -149,16 +148,17 @@ effects_SAI = DataFrame(only(raneftables(model_SAI)))
 print(effects_SAI)
 
 ## Writing alphas .csv
-CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_SAI.csv", effects_SAI)
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_preomicron_SAINEW.csv", effects_SAI)
 
 ## Sensitivity Analysis II (SAII) analysis model:
 ## outcome_i ~ (1|interactionTerm) + outcome_j_1
 formula_SAII = @formula(outcome_i ~ 0 + (1 | interactionTerm) + 
-      # Lags (fixed effects)
-      outcome_j_7 +
-      outcome_j_14 +
-      outcome_j_21
-      )
+# Lags (fixed effects)
+outcome_j_7 +
+outcome_j_14 +
+outcome_j_21 +
+# Autocorr (fixed effect)
+outcome_i_7)
 
 print(formula_SAII)
 
@@ -173,7 +173,7 @@ effects_SAII = DataFrame(only(raneftables(model_SAII)))
 print(effects_SAII)
 
 ## Writing alphas .csv
-CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt_preomicron_SAII.csv", effects_SAII)
+CSV.write("data-products/geo-hexes/mixedmodel/alphas_weekly_preomicron_SAIINEW.csv", effects_SAII)
 
 # autocorr = true
 # ## Choosing between a autocorr term model or a without autocorr model term
