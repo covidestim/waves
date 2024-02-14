@@ -17,9 +17,12 @@ neighbors = CSV.read(
   types = Dict(:i => String, :j => String)
 )
 
+println("neighbors read")
+
 ## Reading hexid observations
 results = CSV.read(
   "data-products/geo-hexes/hexid-observations.csv", 
+  missingstring="NA",
   DataFrame;
   types=Dict(
     geosym        => String,
@@ -30,6 +33,8 @@ results = CSV.read(
     :infectionsPC => Float64
   )
 )
+
+println("results read")
 
 ## Inner Join 1, between the hexid grid and the observations
 joined = innerjoin(
