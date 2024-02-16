@@ -21,7 +21,7 @@ println("neighbors read")
 
 ## Reading hexid observations
 results = CSV.read(
-  "data-products/geo-hexes/hexid-observations.csv", 
+  "data-products/geo-hexes/hexid-observations_preomicronNEW.csv", 
   missingstring="NA",
   DataFrame;
   types=Dict(

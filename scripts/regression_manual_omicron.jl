@@ -19,7 +19,7 @@ neighbors = CSV.read(
 
 ## Reading hexid observations
 results = CSV.read(
-  "data-products/geo-hexes/hexid-observations_omicronNEW.csv", 
+  "data-products/geo-hexes/hexid-observations_omicroneraNEW.csv", 
   DataFrame;
   types=Dict(
     geosym        => String,
@@ -48,11 +48,11 @@ sort!(joined, :date)
 
 ## Predciting variable, can be 'infectionsPC', 'Rt', etc.
 outcome_i_symbol = Symbol("infectionsPC" * "_i")
-print(outcome_i_symbol)
+println(outcome_i_symbol)
 
 ## Covariate variable used to predict, can be 'infectionsPC', 'Rt', etc.
 outcome_j_symbol = Symbol("infectionsPC" * "_j")
-print(outcome_j_symbol)
+println(outcome_j_symbol)
 
 ## groupby the joined dataframe
 joined = groupby(joined, [:i, :j])
@@ -109,7 +109,7 @@ outcome_j_2 +
 outcome_j_3 
 )
 
-print(formula_main)
+println(formula_main)
 
 # Fitting mixed model
 model_main = fit(MixedModel, formula_main, joined, contrasts=Dict(:interactionTerm => Grouping()))

@@ -513,23 +513,21 @@ joined_alphas <- \(alphas, date_col){
     dplyr::group_by(i_to_j, 
              {{ date_col }}) |> 
     dplyr::summarise(raw = alpha,
-              normalized = alpha_normalized) 
-  # |>
-  #   mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
-  #   pivot_longer(cols = raw:standarlized,
-  #                names_to = "type",
-  #                values_to = "values")
+              normalized = alpha_normalized) |>
+    mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |>
+    pivot_longer(cols = raw:standarlized,
+                 names_to = "type",
+                 values_to = "values")
   
   alphas_j_to_i <- alphas |> 
     dplyr::group_by(j_to_i, 
              {{ date_col }}) |> 
     dplyr::summarise(raw = alpha,
-              normalized = alpha_normalized)
-  # |>
-  #   mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |> 
-  #   pivot_longer(cols = raw:standarlized,
-  #                names_to = "type",
-  #                values_to = "values")
+              normalized = alpha_normalized)|>
+    mutate(standarlized = (raw - mean(raw, na.rm = T))/sd(raw, na.rm = T)) |>
+    pivot_longer(cols = raw:standarlized,
+                 names_to = "type",
+                 values_to = "values")
   
   joined_ij <- dplyr::inner_join(alphas_i_to_j, 
                           alphas_j_to_i, 
@@ -541,7 +539,7 @@ joined_alphas <- \(alphas, date_col){
 ## Alphas dataset
 ## Pre-Omicron
 ### Main model
-alphas_week_po_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_main.csv")
+alphas_week_po_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_mainNEW.csv")
 ### SAI model
 alphas_week_po_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAI.csv")
 ### SAII model
@@ -560,8 +558,9 @@ joined_ij_week_po_sa2 <- joined_alphas(alphas = alphas_week_po_sa2,
                                        date_col = date_week)
 
 fig2b <- joined_ij_week_po_main |> 
-  ggplot(aes(x = raw.itoj, 
-             y = raw.jtoi))+
+  ggplot(aes(x = values.itoj, 
+             y = values.jtoi,
+             color = type.itoj))+
   geom_point(alpha = 0.01)+
   theme_minimal()+
   labs(x = expression(alpha["i,j"]),
@@ -570,7 +569,8 @@ fig2b <- joined_ij_week_po_main |>
   # lims(x = c(-50,60), y = c(-50, 60))+
   theme(legend.position = "none", 
         axis.title = element_text(size = 14), 
-        axis.text = element_text(size = 14))
+        axis.text = element_text(size = 14))+
+  facet_wrap(.~type.itoj,nrow = 1,strip.position = "top")
 fig2b
 
 ggsave(filename = "img/fig2b_preomicron_main.png",
