@@ -241,8 +241,8 @@ tempPopTib <- areal::aw_interpolate(
 tempPopTrans <- st_transform(tempPop, crs = 4269)
 tempPopTrans$hexid <- as.numeric(tempPopTrans$hexid) ### used for filtering
 ### Plot the population across the hexes 
-ggplot() + geom_sf(tempPopTrans, mapping=aes(fill=population)) + 
-  geom_sf(tempPopTrans %>% filter(population == 0), mapping=aes(), fill="green")
+# ggplot() + geom_sf(tempPopTrans, mapping=aes(fill=population)) + 
+#   geom_sf(tempPopTrans %>% filter(population == 0), mapping=aes(), fill="green")
 
 ###############################################################################
 ###############################   Infections    ###############################
@@ -255,53 +255,47 @@ to_id <- "hexid"
 from_id <- "from_id"
 
 InfPopAll <- data.frame(hexid = 0,
+                        population = 0,
                          infections = 0, 
                          geometry = tempPop$geometry[1],
                          date = NA)
 
 ### Write a loop for the allocation
 for (i in 1:length(unique(na.omit(observationFips$date)))){
-# for (i in 1:10){ ### for testing
+# for (i in c(120,121)){ ### for testing
   filtDate <- unique(na.omit(observationFips$date))[i]
   print(filtDate)
-  observationsFilt <- observationFips %>% filter(date == filtDate) %>% select(infections, geometry)
+  observationsFilt <- observationFips %>% 
+                      filter(date == filtDate) %>% 
+                      select(infections, geometry)
+  
   observationsFilt$from_id <- as.character(1:nrow(observationsFilt))
   weight_sym <- rlang::sym(weight_column)
   from_id_sym <- rlang::sym(from_id)
   to_id_sym <- rlang::sym(to_id)
   
-  weight_points <- suppressWarnings(tempPop %>% 
-                                    dplyr::select(!!weight_sym) %>% 
-                                    sf::st_point_on_surface()) 
-  
-  #### check the distribution of weight points 
-  # ggplot() + geom_sf(hexgrid, mapping = aes(), fill="transparent") +
-  #   geom_sf(weight_points, mapping=aes(), color = "pink")
-  
-  
-  denominators <- observationsFilt %>% 
-                  sf::st_join(weight_points, left = FALSE) %>% 
+  denominators <- observationsFilt %>%
+                  sf::st_join(tempPop, left = FALSE) %>%
                   sf::st_drop_geometry() %>%
-                  dplyr::group_by(!!from_id_sym) %>% 
-                  dplyr::summarize(weight_total = sum(!!weight_sym, 
+                  dplyr::group_by(!!from_id_sym) %>%
+                  dplyr::summarize(weight_total = sum(!!weight_sym,
                                                       na.rm = TRUE))
   
-  
-  intersections <- suppressWarnings(observationsFilt %>% 
-                                    dplyr::left_join(denominators,by = from_id) %>% 
-                                    sf::st_intersection(hexgrid) %>% 
-                                    dplyr::filter(sf::st_is(., c("POLYGON", "MULTIPOLYGON", "GEOMETRYCOLLECTION"))) %>% 
-                                    dplyr::mutate(intersection_id = dplyr::row_number()) %>% 
-                                    sf::st_join(weight_points, left = TRUE) %>% 
-                                    sf::st_drop_geometry() %>%
-                                    dplyr::group_by(intersection_id) %>% 
-                                    dplyr::mutate(intersection_value = sum(!!weight_sym, na.rm = TRUE)) %>% 
-                                    dplyr::ungroup() %>% 
-                                    dplyr::distinct(intersection_id,.keep_all = TRUE) %>% 
-                                    dplyr::mutate(weight_coef = intersection_value/weight_total) %>% 
-                                    dplyr::select(!!from_id_sym, !!to_id_sym, intersection_value, 
-                                                    weight_coef))
-  
+  intersections <- observationsFilt %>% 
+                  dplyr::left_join(denominators,by = from_id) %>%
+                  sf::st_intersection(tempPop) %>% 
+                  # dplyr::filter(sf::st_is(., c("POLYGON", "MULTIPOLYGON", "GEOMETRYCOLLECTION"))) %>% 
+                  dplyr::mutate(intersection_id = dplyr::row_number()) %>% 
+                  # sf::st_join(tempPop, left = TRUE) %>% 
+                  sf::st_drop_geometry() %>%
+                  dplyr::group_by(intersection_id) %>% 
+                  dplyr::mutate(intersection_value = sum(!!weight_sym, na.rm = TRUE)) %>% 
+                  dplyr::ungroup() %>% 
+                  dplyr::distinct(intersection_id,.keep_all = TRUE) %>% 
+                  dplyr::mutate(weight_coef = intersection_value/weight_total) %>% 
+                  dplyr::select(!!from_id_sym, !!to_id_sym, intersection_value, 
+                                weight_coef)
+
   interpolated <- observationsFilt %>% 
                   sf::st_drop_geometry() %>%
                   dplyr::left_join(intersections,  by = from_id) %>% 
@@ -312,10 +306,16 @@ for (i in 1:length(unique(na.omit(observationFips$date)))){
                                                  .fns = ~sum(.x, na.rm = TRUE))) %>%
                   dplyr::select(-intersection_value)
   
-  output_shapes <- hexgrid %>% 
-                   dplyr::select(!!to_id_sym) %>% 
-                   dplyr::left_join(interpolated, by = to_id) %>% 
-                   rename(geometry = x)
+  output_shapes <- tempPop %>% 
+                   dplyr::select(!!to_id_sym, population) %>%
+                   dplyr::left_join(interpolated, by = to_id)# %>% 
+                   # rename(geometry = x)
+  
+  ggplot() + geom_sf(output_shapes, mapping = aes(fill = infections))+ 
+    theme_minimal() + 
+    scale_fill_gradient(low = "thistle1", high = "deeppink4")  + 
+    geom_sf(output_shapes %>% filter(infections == 0), mapping = aes(), fill="green")
+  
   ##### Date 
   output_shapes$date <- as.Date(filtDate, origin='1970-01-01')
 
@@ -328,27 +328,37 @@ for (i in 1:length(unique(na.omit(observationFips$date)))){
 ###############################################################################
 ### Need to remove the first row of the InfAreaAll dataframe because it was 
 ### for formatting only. 
-hexObservationsAll <- full_join(InfPopAll[-1,], tempPopTib, by=c("hexid")) %>% 
-  mutate(
-         # infections = ifelse (population >= infections, infections, population),
-         infectionsPC = ifelse(population == 0, 0, infections/population),
-         date = as.Date(date, origin='1970-01-01'))
+hexObservationsAll <- InfPopAll[-1,] %>% 
+                      mutate(infectionsPC = ifelse(population == 0, 0, infections/population))
 
 ### Create an SF version for plots 
 hexObservationsAllSF <- st_as_sf(hexObservationsAll)
 
+# testDate <- unique(na.omit(observationFips$date))[120]
+
+### Check if we have the same number of infections 
+if(sum(observationFips %>% 
+       st_drop_geometry() %>% 
+       filter(date == testDate) %>% 
+       select(infections)) - 
+   sum(hexObservationsAll %>% 
+       filter(date == testDate, is.na(infections)==FALSE) %>% 
+       select(infections)) > 1) {
+     print("signicant loss of infections in interpolation step")
+}
+
+# hexgrid$hexid <- as.numeric(hexgrid$hexid)
+# hexObsLoad <- full_join(hexObsPreOm, hexgrid, by = "hexid")
+
 ### Check with a plot 
-# ggplot() + geom_sf(hexObservationsAllSF %>% filter(date == testDate), 
-#                    mapping=aes(fill=infections)) + 
-#   scale_fill_gradient(low = "thistle1", high = "deeppink4") + 
-#   geom_sf(hexObservationsAllSF %>% filter(infections == 0), 
-#           mapping=aes(), fill="green")
-# 
-# ggplot() + geom_sf(hexObservationsAllSF %>% filter(date == testDate), 
-#                    mapping=aes(fill=infectionsPC)) + 
-#   scale_fill_gradient(low = "thistle1", high = "deeppink4") + 
-#   geom_sf(hexObservationsAllSF %>% filter(infectionsPC == 0),
-#           mapping=aes(), fill="green")
+ggplot() +
+  geom_sf(hexObservationsAllSF %>% filter(date == testDate),
+                   mapping=aes(fill=infectionsPC)) +
+  scale_fill_gradient(low = "thistle1", high = "deeppink4") +
+  geom_sf(hexObservationsAllSF %>% filter(infectionsPC == 0),
+          mapping=aes(), fill="green") + 
+  geom_sf(observationFips %>% filter(date == testDate, infections == 0), 
+          mapping=aes(), color = "red")
 
 ###############################################################################
 ###### Save to a CSV 
@@ -360,15 +370,36 @@ hexObservationsAll$infectionsPC <- as.numeric(hexObservationsAll$infectionsPC)
 ### Remove missing values for infectionsPC 
 hexObservationsAllNoMissing <- hexObservationsAll %>% filter(is.na(infectionsPC) == FALSE)
 ### Remove the unnecessary columns of geometry and population
-hexObservationsAllNoMissing <- hexObservationsAllNoMissing[,-c(4:5)] 
+hexObservationsAllNoMissing <- hexObservationsAllNoMissing[,] 
 
 write_csv(hexObservationsAllNoMissing, 
           file = paste0("data-products/geo-hexes/hexid-observations_", args$modelVersion, ".csv"))
+
+
+hexObservationsAllNoMissingGeom <- full_join(hexObservationsAllNoMissing, hexgrid, 
+                                             by = "hexid")
+
+hexObservationsAllNoMissingGeom <- st_as_sf(hexObservationsAllNoMissingGeom)
+
+testDate <- unique(na.omit(observationFips$date))[320]
+
+ggplot() +
+  geom_sf(hexObservationsAllNoMissingGeom %>% filter(date == testDate) ,
+          mapping=aes(fill=infectionsPC)) +
+  scale_fill_gradient(low = "thistle1", high = "deeppink4") +
+  geom_sf(hexObservationsAllNoMissingGeom %>% filter(date == testDate,
+                                                     infectionsPC == 0),
+          mapping=aes(), fill="green") + 
+  geom_sf(observationFips %>% filter(date == testDate, infections == 0), 
+          mapping=aes(), color = "red")
+
+
+
 ###############################################################################
 ###### Save an SF for plots 
 ###############################################################################
 geojson_write(
-  hexObservationsAllSF,
+  hexObservationsAllNoMissingGeom,
   geometry  = "polygon",
   file      = paste0("data-products/geo-hexes/hexid-observations_", args$modelVersion, ".geojson"),
   overwrite = T,
