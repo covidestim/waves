@@ -20,7 +20,7 @@ library(docopt)
 # args <- docopt(doc, version = 'transformResults_weekly.R 0.1')
 
 d <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_preomicron_mainNEW.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_omicronera_mainNEW.csv",
   col_types = cols(
     interactionTerm = col_character(),
     `(Intercept)` = col_number()
@@ -47,7 +47,7 @@ d1_with_normalized <- d1 |>
   mutate(alpha_normalized = alpha / mean(abs(alpha)))
 
 write_csv(d1_with_normalized, 
-          "data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_mainNEW.csv")
+          "data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_omicronera_mainNEW.csv")
 
 # vroom::vroom_write(d1_with_normalized, 
 #           "data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera.csv.xz")

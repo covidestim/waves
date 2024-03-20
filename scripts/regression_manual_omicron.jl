@@ -19,7 +19,7 @@ neighbors = CSV.read(
 
 ## Reading hexid observations
 results = CSV.read(
-  "data-products/geo-hexes/hexid-observations_omicroneraNEW.csv", 
+  "data-products/geo-hexes/hexid-observations_omicronera.csv", 
   DataFrame;
   types=Dict(
     geosym        => String,

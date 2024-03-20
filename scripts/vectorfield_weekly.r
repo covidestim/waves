@@ -44,7 +44,7 @@ neighbors <- read_csv(
 
 # ps("Reading {.file {args$alphas}}")
 alphas <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_mainNEW.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_omicronera_mainNEW.csv",
   col_types = cols_only(
     i = col_character(), j = col_character(),
     date_week = col_date(),
@@ -57,7 +57,7 @@ alphas <- read_csv(
 
 # ps("Reading {.file {args$observations}}")
 observations <- read_csv(
-  "data-products/geo-hexes/hexid-observations_preomicronNEW.csv",
+  "data-products/geo-hexes/hexid-observations_omicronera.csv",
   col_types = cols(
     hexid = col_character(),
     date = col_date(),
@@ -191,9 +191,9 @@ features_from_wkt <- joined_vector_mean %>%
 # all.equal(unique(alphas$date_week), unique(features_from_wkt$date_week))
 
 # ps("Writing {.file {args$o}}")
-write_sf(features_from_wkt,
-         "data-products/geo-hexes/vectors/vectors_weekly_preomicron_mainNEW.geojson",
-         append = F)
+sf::st_write(features_from_wkt,
+         "data-products/geo-hexes/vectors/vectors_weekly_omicronera_mainNEW.geojson",
+         delete_dsn = T)
 
 # geojson_write(input = features_from_wkt,
 #               file = "data-products/geo-hexes/vectors/vectors_weekly_regardless_rt_omicron.geojson",

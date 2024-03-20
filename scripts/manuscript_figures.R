@@ -541,9 +541,9 @@ joined_alphas <- \(alphas, date_col){
 ### Main model
 alphas_week_po_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_mainNEW.csv")
 ### SAI model
-alphas_week_po_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAI.csv")
+alphas_week_po_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_SAINEW.csv")
 ### SAII model
-alphas_week_po_sa2 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_preomicron_SAII.csv")
+alphas_week_po_sa2 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_SAIINEW.csv")
 
 ## Joined data.frames
 ## Main
@@ -573,15 +573,15 @@ fig2b <- joined_ij_week_po_main |>
   facet_wrap(.~type.itoj,nrow = 1,strip.position = "top")
 fig2b
 
-ggsave(filename = "img/fig2b_preomicron_main.png",
+ggsave(filename = "img/extra_figures/fig2b_preomicron_main.png",
        plot = fig2b,
        width = 16,
        height = 9, 
        dpi = 100)
 
 fig2c <- joined_ij_week_po_sa1 |> 
-  ggplot(aes(x = raw.itoj, 
-             y = raw.jtoi))+
+  ggplot(aes(x = values.itoj, 
+             y = values.jtoi))+
   geom_point(alpha = 0.01)+
   theme_minimal()+
   labs(x = expression(alpha["i,j"]),
@@ -593,7 +593,7 @@ fig2c <- joined_ij_week_po_sa1 |>
         axis.text = element_text(size = 14))
 fig2c
 
-ggsave(filename = "img/fig2c_preomicron_SAI.png",
+ggsave(filename = "img/extra_figures/fig2c_preomicron_SAI.png",
        plot = fig2c,
        width = 16,
        height = 9, 
@@ -621,11 +621,11 @@ ggsave(filename = "img/fig2d_preomicron_SAII.png",
 
 ## Omicron-era
 ### Main model
-alphas_week_oe_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_main.csv")
+alphas_week_oe_main <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_omicronera_mainNEW.csv")
 ### SAI model
-alphas_week_oe_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_SAI.csv")
+alphas_week_oe_sa1 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_omicronera_SAINEW.csv")
 ### SAII model
-alphas_week_oe_sa2 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_regardless_rt-reformat_omicronera_SAII.csv")
+alphas_week_oe_sa2 <- vroom::vroom("data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_omicronera_SAIINEW.csv")
 
 ## Joined data.frames
 ## Main
