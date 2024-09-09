@@ -17,128 +17,11 @@ cbgpop <- sf::st_read("data-products/geo-hexes/cbg_population.shp")
 
 hexpop <- sf::st_read("data-products/geo-hexes/hexid-population.shp")
 
-us_states <- tigris::states(cb = T) |> 
-  dplyr::filter(!STATEFP %in% excludes) |> 
-  tigris::shift_geometry()
-
-new_england_states <- us_states |> 
-  dplyr::filter(GEOID %in% c("09","23","25","33","44","50"))
-
-new_england_counties <- tigris::counties(state = c("09","23","25","33","44","50"))
-
-ct_counties <- tigris::counties(state = 09)
-
-cbgpop <- sf::st_transform(cbgpop, crs = 26915)
-us_states <- sf::st_transform(us_states, crs = 26915)
-
-us_cbg <- ggplot() + 
-  geom_sf(cbgpop,
-          mapping = aes(fill=population, color=population)) +
-  geom_sf(us_states,
-          mapping=aes(),
-          color = "deeppink3",
-          fill = "transparent")+
-  theme_minimal() + 
-  scale_fill_gradient(low = "thistle1", high = "deeppink4")+
-  scale_color_gradient(low = "thistle1", high = "deeppink4")
-us_cbg
-
-new_england <- ggplot() + 
-  geom_sf(cbgpop |> 
-            filter(substr(GEOID,1,2) %in% c("09","23","25","33","44","50")), 
-          mapping = aes(fill=population, color=population)) + 
-  geom_sf(new_england_states,
-          mapping=aes(),
-          color = "deeppink3",
-          fill = "transparent")+
-  theme_minimal() + 
-  scale_fill_gradient(low = "thistle1", high = "deeppink4")+
-  scale_color_gradient(low = "thistle1", high = "deeppink4")
-new_england
-
-ct <- ggplot() + 
-  geom_sf(cbgpop |> 
-            filter(substr(GEOID,1,2) == "09"), 
-          mapping = aes(fill=population, 
-                        color=population)) + 
-  geom_sf(ct_counties,
-          mapping=aes(),
-          color = "deeppink3",
-          fill = "transparent")+
-  theme_minimal() + 
-  scale_fill_gradient(low = "thistle1", high = "deeppink4")+
-  scale_color_gradient(low = "thistle1", high = "deeppink4")
-ct
-
-library(patchwork)
-pop_zoom <- (new_england | ct)+
-  plot_layout(guides = 'collect')
-pop_zoom
-
-ggsave(plot = pop_zoom,
-       file = "img/extra_figures/population_zoom.png",
-       width = 16,
-       height = 9,
-       dpi = 100
-)
-
-## Hexgrid plots
-us_hex_plt <- ggplot() + 
-  geom_sf(hexpop, 
-          mapping=aes(fill=population)) +
-  # geom_sf(us_states,
-  #         mapping=aes(),
-  #         color = "thistle4",
-  #         fill = "transparent",
-  #         size = 1.2)+
-  scale_fill_gradient(low = "thistle1", high = "deeppink3")+
-  scale_color_gradient(low = "thistle1", high = "deeppink3")+
-  theme_minimal()
-us_hex_plt
-
-hexes_to_county <- vroom::vroom("data-products/geo-hexes/hexid-fips-map.csv")
-
-hexpop <- hexpop |> 
-  left_join(hexes_to_county |> select(hexid, fips)) |> 
-  mutate(STATEFP = str_sub(fips, 1, 2))
-
-new_england_hexpop <- hexpop |> 
-  filter(STATEFP %in% c("09","23","25","33","44","50"))
-
-new_england_hex_plt <- ggplot()+
-  geom_sf(new_england_hexpop,
-          mapping=aes(fill=population))+ 
-  geom_sf(new_england_states,
-          mapping=aes(),
-          color = "deeppink3",
-          fill = "transparent")+
-  theme_minimal() + 
-  scale_fill_gradient(low = "thistle1", high = "deeppink4")
-new_england_hex_plt
-
-ct_hexpop <- hexpop |> 
-  filter(STATEFP %in% c("09"))
-
-ct_hex_plt <- ggplot()+
-  geom_sf(ct_hexpop,
-          mapping=aes(fill=population))+ 
-  geom_sf(ct_counties,
-          mapping=aes(),
-          color = "deeppink3",
-          fill = "transparent")+
-  theme_minimal() + 
-  scale_fill_gradient(low = "thistle1", high = "deeppink4")
-ct_hex_plt
-
-library(patchwork)
-hexpop_zoom <- ((new_england_hex_plt | ct_hex_plt)/(new_england | ct))+
-  plot_layout(guides = 'collect')
-hexpop_zoom
-
+## 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp")
 
 ## Pre-Omicron
-hexgrid_infections <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv") |>
+hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
   select(-geometry) |>
@@ -146,86 +29,94 @@ hexgrid_infections <- vroom::vroom("data-products/geo-hexes/hexid-observations_p
   filter(infectionsPC >= 1) |>
   left_join(hexes, by = "hexid") |>
   sf::st_as_sf()
+
+alpha_peak <- as.Date("2020-11-19")
+delta_peak <- as.Date("2021-09-08")
+
+hexgrid_test <- hexgrid_preomicron |> 
+  filter(date %in% seq.Date(to = delta_peak_date, 
+                            from = delta_peak_date-63, length.out = 64))
+
+sf::st_write(obj = hexgrid_test,
+             dsn = "data-products/hexgrid-infections-delta.geojson",
+             delete_dsn = T)
 
 # ## Omicron-era
-hexgrid_infections <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
+hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
-  select(-geometry) |>
-  mutate(infectionsPC = (infections/population)*1e5) |>
+  # select(-geometry) |>
+  # mutate(infectionsPC = (infections/population)*1e5) |>
   filter(infectionsPC >= 1) |>
   left_join(hexes, by = "hexid") |>
   sf::st_as_sf()
 
-hexgrid_no_geometry <- hexgrid_infections |> 
-  st_drop_geometry() |> 
-  select(-population)
+## Breakdowns of each peaks
+breaks_plt <- seq(0,2500, 250)
+labels_plt <- c(seq(0,2250, 250), '2,500+')
+limits_plt <- c(0,2500)
+color_option <- "magma"
 
-# vroom_write(hexgrid_no_geometry,
-#             file = "data-products/geo-hexes/hexid-observations_preomicron.csv")
+hexgrid_infections_test <- hexgrid_preomicron |> 
+  filter(date == delta_peak_date) |>
+  sf::st_transform(crs = 26915) |> 
+  sf::st_as_sf()
 
-alpha_peak_date <- as.Date("2021-08-26")
-
-hexgrid_infections_test <- hexgrid_infections |> 
-  filter(date == alpha_peak_date) |>
-  sf::st_transform(crs = 26915)
-
-plt_peak_alpha <- ggplot()+
+plt_peak_delta <- ggplot()+
   geom_sf(data = hexgrid_infections_test,
           mapping = aes(fill = infectionsPC))+
-  geom_sf(data = hexgrid_infections |>
-            filter(date == alpha_peak_date) |>
+  geom_sf(data = hexgrid_infections_test |>
             filter(infectionsPC == 0),
           mapping = aes(),
           fill = "grey70")+
-  scale_fill_viridis_c(option = "magma",
-                       name = "Infections PC",
-                       # direction = -1,
-                       breaks = seq(1, 1001, 100),
-                       labels = c(">1", seq(100, 900, 100), "1,000+"),
-                       limits = c(1,1001),
-                       oob = scales::squish,
-                       guide = metR::guide_colorstrip(title.position = "left",
-                                                      title.hjust = 0.5,
-                                                      barheight = grid::unit(12, "cm")))+
+  scale_fill_viridis_b(option = color_option,
+                       name = "Estimated Infections/100k/week",
+                       direction = -1,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+                       )+
   theme_minimal()+
-  theme(legend.title = element_text(angle = 90))+
-  labs(title = alpha_peak_date,
-       subtitle = "Alpha wave peak")
-plt_peak_alpha
+  theme(legend.title.position = "top",
+        legend.location = "plot",
+        legend.position = "bottom", 
+        legend.key.width = grid::unit(3, "cm"))+
+  labs(title = delta_peak_date,
+       subtitle = "Delta wave peak")
+plt_peak_delta
 
-ggsave(plot = plt_peak_alpha,
-       filename = "img/extra_figures/plot_peak_alpha.png",
+ggsave(plot = plt_peak_delta,
+       filename = "img/extra_figures/plot_peak_delta.png",
        width = 16, 
        height = 9, 
        dpi = 100)
 
 omicron_peak_date <- as.Date("2022-01-20")
 
-hexgrid_infections_test <- hexgrid_infections |> 
+hexgrid_infections_test <- hexgrid_omicronera |> 
   filter(date == omicron_peak_date) |>
   sf::st_transform(crs = 26915)
 
 plt_peak_omicron <- ggplot()+
   geom_sf(data = hexgrid_infections_test,
           mapping = aes(fill = infectionsPC))+
-  geom_sf(data = hexgrid_infections |>
+  geom_sf(data = hexgrid_infections_test |>
             filter(date == omicron_peak_date) |>
             filter(infectionsPC == 0),
           mapping = aes(),
           fill = "grey70")+
-  scale_fill_viridis_c(option = "magma",
-                       name = "Infections PC",
+  scale_fill_viridis_b(option = color_option,
+                       name = "Estimated Infections/100k/week",
                        direction = -1,
-                       breaks = seq(1, 5001, 499),
-                       labels = c(">1", seq(500, 4500, 500), "5,000+"),
-                       limits = c(1,5001),
-                       oob = scales::squish,
-                       guide = metR::guide_colorstrip(title.position = "left",
-                                                      title.hjust = 0.5,
-                                                      barheight = grid::unit(12, "cm")))+
-  theme_dark()+
-  theme(legend.title = element_text(angle = 90))+
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  theme_minimal()+
+  theme(legend.title.position = "top",
+        legend.location = "plot",
+        legend.position = "bottom", 
+        legend.key.width = grid::unit(3, "cm"))+
   labs(title = omicron_peak_date,
        subtitle = "Omicron wave peak")
 plt_peak_omicron
@@ -236,15 +127,12 @@ ggsave(plot = plt_peak_omicron,
        height = 9, 
        dpi = 100)
 
-## function to plot alphas
+## function to plot hexes with infections
 plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
   
   # Filter the data for the current week
   infections <- infections |> 
     filter(date == week)
-  # alphas <- alphas[alphas$date_week == week, ]
-  
-  if(!is.omicron){
     
     plot_alphas <- ggplot()+
       geom_sf(data = hexes,
@@ -253,61 +141,18 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
               aes(fill = infectionsPC),
               alpha = 0.75,
               size = 3)+
-      scale_fill_viridis_c(option = "magma",
-                           name = "Infections PC",
-                           # direction = -1,
-                           breaks = seq(1, 1001, 100),
-                           labels = c(">1", seq(100, 900, 100), "1,000+"),
-                           limits = c(1,1001),
-                           oob = scales::squish,
-                           guide = metR::guide_colorstrip(title.position = "left",
-                                                          title.hjust = 0.5,
-                                                          barheight = grid::unit(12, "cm")))+
+      scale_fill_viridis_b(option = color_option,
+                           name = "Estimated Infections/100k/week",
+                           direction = -1,
+                           breaks = breaks_plt,
+                           labels = labels_plt,
+                           limits = limits_plt,
+      )+
       theme_minimal()+
-      theme(legend.title = element_text(angle = 90))
-    # guides(alpha = "none",
-    #        color = guide_legend(order = 1),
-    #        fill = guide_legend(order = 2))+
-    # theme(axis.title = element_blank(), 
-    #       legend.position = "left",
-    #       legend.box = "vertical",
-    #       legend.title = element_text(angle = 90))+
-    # labs(title = "Alphas")+
-    # coord_sf(xlim = st_bbox(hexes)[c(1,3)],
-    #          ylim = st_bbox(hexes)[c(2,4)])
-    # plot_alphas 
-  }else{
-    plot_alphas <- ggplot()+
-      geom_sf(data = hexes,
-              fill = "transparent")+
-      geom_sf(data = infections,
-              aes(fill = infectionsPC),
-              alpha = 0.75,
-              size = 3)+
-      scale_fill_viridis_c(option = "magma",
-                           name = "Infections PC",
-                           # direction = -1,
-                           breaks = seq(1, 5001, 500),
-                           labels = c(">1", seq(100, 4500, 500), "5,000+"),
-                           limits = c(1,5001),
-                           oob = scales::squish,
-                           guide = metR::guide_colorstrip(title.position = "left",
-                                                          title.hjust = 0.5,
-                                                          barheight = grid::unit(12, "cm")))+
-      theme_minimal()+
-      theme(legend.title = element_text(angle = 90))
-    # guides(alpha = "none",
-    #        color = guide_legend(order = 1),
-    #        fill = guide_legend(order = 2))+
-    # theme(axis.title = element_blank(), 
-    #       legend.position = "left",
-    #       legend.box = "vertical",
-    #       legend.title = element_text(angle = 90))+
-    # labs(title = "Alphas")+
-    # coord_sf(xlim = st_bbox(hexes)[c(1,3)],
-    #          ylim = st_bbox(hexes)[c(2,4)])
-    # plot_alphas
-  }
+      theme(legend.title.position = "top",
+            legend.location = "plot",
+            legend.position = "bottom", 
+            legend.key.width = grid::unit(3, "cm"))
   
   library(patchwork)
   # plot <- (plot_infections | plot_alphas)
@@ -326,16 +171,17 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
   return(tmp_file)
 }
 
-weeks <- sort(unique(hexgrid_infections$date))
+weeks <- sort(unique(hexgrid_preomicron$date))
 
 hexes <- hexes |>
   filter(as.integer(hexid)<7662) |> 
+  st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
-frame_files <- lapply(weeks, 
+frame_files <- lapply(weeks[seq(1,649, 7)], 
                       plt_fun, 
                       TRUE,
-                      st_transform(hexgrid_infections, 
+                      st_transform(hexgrid_preomicron, 
                                    crs = 26915), 
                       st_transform(hexes, 
                                    crs = 26915),
@@ -350,34 +196,70 @@ animation2 <- magick::image_animate(magick::image_read(frame_files),
 animation2
 
 # Specify the output file path
-output_file <- "img/weekly_hex_omicronera.gif"
+output_file <- "img/weekly_hex_preomicron.gif"
 
 # Save the GIF animation
 magick::image_write(animation2, output_file)
 
-## gif for the infections on counties shapes
-observationFips <- st_read("data-products/geo-hexes/observations_preomicron.shp")
+## Gif to Omicron-era
+weeks <- sort(unique(hexgrid_omicronera$date))
 
-testDate <- "2020-07-26"
+frame_files <- lapply(weeks, 
+                      plt_fun, 
+                      TRUE,
+                      st_transform(hexgrid_omicronera, 
+                                   crs = 26915), 
+                      st_transform(hexes, 
+                                   crs = 26915),
+                      TRUE)
 
-observationFips <- st_read("data-products/geo-hexes/observations_omicronera.shp")
+frame_files <- frame_files |> 
+  unlist()
 
-testDate <- "2022-01-20"
+animation3 <- magick::image_animate(magick::image_read(frame_files), 
+                                    fps = 4, 
+                                    optimize = T)
+animation3
 
-### Explore with a plot
-ggplot() + 
-  geom_sf(observationFips_omicronera %>% filter(date == testDate),
-          mapping=aes(fill=infctPC)) +
-  theme_minimal() +
-  scale_fill_gradient(low = "lightgreen", high = "deeppink2")
+# Specify the output file path
+output_file <- "img/weekly_hex_omicronera.gif"
 
-## function to plot alphas
-plt_preomicron <- \(week, infections, hexes, plot_img = TRUE) {
+# Save the GIF animation
+magick::image_write(animation3, output_file)
+
+## Joinning everything
+hexgrid_preomicron <- hexgrid_preomicron |> 
+  select(-population) |> 
+  st_drop_geometry()
+
+hexgrid_omicronera <- hexgrid_omicronera |> 
+  st_drop_geometry()
+
+hexgrid_full <- bind_rows(hexgrid_preomicron, hexgrid_omicronera) |> 
+  left_join(hexes, by = "hexid") |>
+  sf::st_as_sf() |> 
+  sf::st_transform(crs=26915)
+
+hexgrid_full |> 
+  group_by(date) |> 
+  summarise(infectionsPC = sum(infectionsPC)) |> 
+  ggplot(aes(x=sort(date), y = infectionsPC))+
+  geom_line()
+
+## Breakdowns of each peaks
+breaks_plt <- seq(0,2500, 250)
+labels_plt <- c(seq(0,2250, 250), '2,500+')
+limits_plt <- c(0,2500)
+color_option <- "magma"
+delta_peak_date <- as.Date("2021-08-26")
+omicron_peak_date <- as.Date("2022-01-20")
+
+## function to plot hexes with infections
+plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
   
   # Filter the data for the current week
   infections <- infections |> 
     filter(date == week)
-  # alphas <- alphas[alphas$date_week == week, ]
   
   plot_alphas <- ggplot()+
     geom_sf(data = hexes,
@@ -386,29 +268,18 @@ plt_preomicron <- \(week, infections, hexes, plot_img = TRUE) {
             aes(fill = infectionsPC),
             alpha = 0.75,
             size = 3)+
-    scale_fill_viridis_c(option = "magma",
-                         name = "Infections PC",
-                         # direction = -1,
-                         breaks = seq(0, 5000, 1000),
-                         labels = c(seq(0, 4000, 1000), "5,000+"),
-                         limits = c(0,5000),
-                         oob = scales::squish,
-                         guide = metR::guide_colorstrip(title.position = "left",
-                                                        title.hjust = 0.5,
-                                                        barheight = grid::unit(12, "cm")))+
+    scale_fill_viridis_b(option = color_option,
+                         name = "Estimated Infections/100k/week",
+                         direction = -1,
+                         breaks = breaks_plt,
+                         labels = labels_plt,
+                         limits = limits_plt,
+    )+
     theme_minimal()+
-    theme(legend.title = element_text(angle = 90))
-  # guides(alpha = "none",
-  #        color = guide_legend(order = 1),
-  #        fill = guide_legend(order = 2))+
-  # theme(axis.title = element_blank(), 
-  #       legend.position = "left",
-  #       legend.box = "vertical",
-  #       legend.title = element_text(angle = 90))+
-  # labs(title = "Alphas")+
-  # coord_sf(xlim = st_bbox(hexes)[c(1,3)],
-  #          ylim = st_bbox(hexes)[c(2,4)])
-  # plot_alphas
+    theme(legend.title.position = "top",
+          legend.location = "plot",
+          legend.position = "bottom", 
+          legend.key.width = grid::unit(3, "cm"))
   
   library(patchwork)
   # plot <- (plot_infections | plot_alphas)
@@ -427,12 +298,113 @@ plt_preomicron <- \(week, infections, hexes, plot_img = TRUE) {
   return(tmp_file)
 }
 
+weeks <- sort(unique(hexgrid_full$date))
 
-weeks <- sort(unique(observationFips$date))
+hexes <- hexes |>
+  filter(as.integer(hexid)<7662) |> 
+  st_transform(crs = 26915) |> 
+  sf::st_as_sf()
 
 frame_files <- lapply(weeks, 
+                      plt_fun, 
+                      TRUE,
+                      st_transform(hexgrid_full, 
+                                   crs = 26915), 
+                      st_transform(hexes, 
+                                   crs = 26915),
+                      TRUE)
+
+frame_files <- frame_files |> 
+  unlist()
+
+animation4 <- magick::image_animate(magick::image_read(frame_files), 
+                                    # fps = 3, 
+                                    optimize = T)
+animation4
+
+# Specify the output file path
+output_file <- "img/weekly_hex_complete.gif"
+
+# Save the GIF animation
+magick::image_write(animation4, output_file)
+
+## gif for the infections on counties shapes
+observationFips_preomicron <- st_read("data-products/geo-hexes/observations_preomicron.shp")
+
+preomicron_testDate <- "2020-07-26"
+
+observationFips_omicronera <- st_read("data-products/geo-hexes/observations_omicronera.shp")
+
+omicronera_testDate <- "2022-01-20"
+
+## US map
+
+us_states <- tigris::counties(cb = T) |> 
+  filter(!STATEFP %in% c(
+    "02", "60", "03", "81", "07", "64",
+    "14", "66", "84", "86", "67", "89",
+    "68", "71", "76", "69", "70", "95",
+    "43", "72", "74", "78", "79", "15", "11"
+  )) |> 
+  tigris::shift_geometry()
+# 
+# ### Explore with a plot
+# ggplot() + 
+#   geom_sf(observationFips_preomicron %>% filter(date == preomicron_testDate),
+#           mapping=aes(fill=infctPC)) +
+#   theme_minimal() +
+#   scale_fill_gradient(low = "lightgreen", high = "deeppink2")
+
+## function to plot alphas
+plt_preomicron <- \(week, infections, hexes, plot_img = TRUE) {
+  
+  # Filter the data for the current week
+  infections <- infections |> 
+    filter(date == week)
+  
+  plot_alphas <- ggplot()+
+    geom_sf(data = hexes,
+            fill = "transparent")+
+    geom_sf(data = infections,
+            aes(fill = infectionsPC),
+            alpha = 0.75,
+            size = 3)+
+    scale_fill_viridis_b(option = color_option,
+                         name = "Estimated Infections/100k/week",
+                         direction = -1,
+                         breaks = breaks_plt,
+                         labels = labels_plt,
+                         limits = limits_plt,
+    )+
+    theme_minimal()+
+    theme(legend.title.position = "top",
+          legend.location = "plot",
+          legend.position = "bottom", 
+          legend.key.width = grid::unit(3, "cm"))
+  
+  library(patchwork)
+  # plot <- (plot_infections | plot_alphas)
+  plot <- plot_alphas
+  
+  if(plot_img){
+    plot <- plot &
+      labs(tag = paste("Week:", week))
+  }
+  
+  # # Save the plot as a temporary file
+  tmp_file <- tempfile(fileext = ".png")
+  ggsave(tmp_file, plot, width = 16, height = 9)
+  
+  # Return the temporary file path
+  return(tmp_file)
+}
+
+## Gif on county polygons maps - Pre-Omicron
+weeks <- sort(unique(observationFips_preomicron$date))
+
+frame_files <- lapply(weeks[seq(1,649, 7)], 
                       plt_preomicron, 
-                      observationFips |> 
+                      observationFips_preomicron |> 
                         rename(infectionsPC = infctPC), 
                       us_states,
                       TRUE)
@@ -440,12 +412,42 @@ frame_files <- lapply(weeks,
 frame_files <- frame_files |> 
   unlist()
 
-animation3 <- magick::image_animate(magick::image_read(frame_files), 
+animation4 <- magick::image_animate(magick::image_read(frame_files), 
                                     fps = 4, 
                                     optimize = T)
 
-animation3
+animation4
 
+# Specify the output file path
+output_file <- "img/weekly_fips_preomicron.gif"
+
+# Save the GIF animation
+magick::image_write(animation4, output_file)
+
+## Gif on county polygons maps - Omicron Era
+weeks <- sort(unique(observationFips_omicronera$date))
+
+frame_files <- lapply(weeks[1:50], 
+                      plt_preomicron, 
+                      observationFips_omicronera |> 
+                        rename(infectionsPC = infctPC), 
+                      us_states,
+                      TRUE)
+
+frame_files <- frame_files |> 
+  unlist()
+
+animation5 <- magick::image_animate(magick::image_read(frame_files), 
+                                    fps = 4, 
+                                    optimize = T)
+
+animation5
+
+# Specify the output file path
+output_file <- "img/weekly_fips_omicronera.gif"
+
+# Save the GIF animation
+magick::image_write(animation5, output_file)
 
 # ## Pre-Omicron
 features_preomicron <- sf::st_read("data-products/geo-hexes/vectors/vectors_weekly_preomicron_mainNEW.geojson") |>
@@ -466,53 +468,31 @@ features_omicronera <- sf::st_read("data-products/geo-hexes/vectors/vectors_week
 # features_omicronera <- geojsonsf::geojson_sf("data-products/geo-hexes/vectors/vectors_weekly_omicronera_mainNEW.geojson")
 
 ## statistics over the vectors
-
-plot_alphas <- ggplot()+
-  geom_point()
-
 ## function to plot alphas
 plt_vectors <- \(week, alphas, hexes, plot_img = TRUE) {
   
   # Filter the data for the current week
   alphas <- alphas |> 
     filter(date_week == week)
-  # alphas <- alphas[alphas$date_week == week, ]
   
   plot_alphas <- ggplot()+
     geom_sf(data = hexes,
             fill = "transparent")+
-    # geom_sf(data = alphas,
-    #         aes(fill = alpha),
-    #         alpha = 0.75,
-    #         size = 3,  
-    #         arrow = arrow(ends = "last", 
-    #                       type = "open", 
-    #                       length = unit(0.5, "cm")))+
     ggquiver::geom_quiver(data = alphas,
                           aes(x = lon, y = lat,
                               u = -delta_lon, v = -delta_lat, 
                               color = alpha,
                               alpha = alpha))+
-    # scale_color_viridis_c(option = "inferno",
-    #                       name = "Alpha value",
-    #                       # direction = -1,
-    #                       breaks = seq(0, 1400, 100),
-    #                       labels = c(seq(0, 1300, 100), "1,400+"),
-    #                       limits = c(0,1400),
-    #                       oob = scales::squish,
-    #                       guide = metR::guide_colorstrip(title.position = "left",
-    #                                                      title.hjust = 0.5,
-    #                                                      barheight = grid::unit(12, "cm")))+
-    MoMAColors::scale_color_moma_c(name = "Infections per capita/week",
-                                   palette_name = "vonHeyl",
-                                   direction = -1,
-                                   breaks = seq(0, 1000, 100),
-                                   labels = c(seq(0, 900, 100), "1,000+"),
-                                   limits = c(0,1000),
-                                   oob = scales::squish,
-                                   guide = metR::guide_colorstrip(title.position = "left",
-                                                                  title.hjust = 0.5,
-                                                                  barheight = grid::unit(12, "cm")))+
+    scale_color_viridis_b(option = "inferno",
+                          name = "Alpha value",
+                          # direction = -1,
+                          breaks = seq(0, 1400, 100),
+                          labels = c(seq(0, 1300, 100), "1,400+"),
+                          limits = c(0,1400),
+                          oob = scales::squish,
+                          guide = metR::guide_colorstrip(title.position = "left",
+                                                         title.hjust = 0.5,
+                                                         barheight = grid::unit(12, "cm")))+
     ggdark::dark_theme_minimal()+
     theme(legend.title = element_text(angle = 90))+
     guides(alpha = "none")+
@@ -669,4 +649,145 @@ animation4 <- magick::image_animate(magick::image_read(frame_files),
                                     optimize = T)
 
 animation4
+
+dataset <- "preomicron"
+
+## If reruns need to be made from a saved df, read it as a data.frame and use the following code to rebuilty it as a list to rerun at the above for loop
+CAR_df <- vroom::vroom(paste0("data-products/tsa_",
+                                    dataset, 
+                                    ".csv"))
+
+dataset <- "omicronera"
+
+CAR_df <- vroom::vroom(paste0("data-products/tsa_",
+                              dataset, 
+                              ".csv"))
+
+## Returning the data.frame into a list format
+CAR_list <- CAR_df |> 
+  group_split(date) |> 
+  as.list()
+
+## Turning the CAR_df mean and sd columns into exponentiated values if the log transform was needed, usually at the Omicron-era dataset
+CAR_df <- bind_rows(CAR_list) |> 
+  ## To the Omicron dataset we rescaled the infectionsPC to 1e5, now need to rescale back
+  mutate(mean = mean*1e5,
+         sd = sd*1e5)
+
+## Breakdowns of each peaks, Pre-Omicron
+breaks_plt <- c(0,seq(150,300, 20))
+labels_plt <- c("150< ",seq(150,280, 20), ' >300')
+limits_plt <- c(0,350)
+color_option <- "magma"
+
+## Breakdowns of each peaks, Omicron-era
+breaks_plt <- c(seq(0, 5000, 500))
+labels_plt <- c("500< ",seq(500, 4500, 500), ' >5,000')
+limits_plt <- c(0,36000)
+color_option <- "magma"
+
+## function to plot hexes with infections
+plt_fun <- \(week, hexes, CAR_df, plot_img = TRUE) {
+  
+  plot_alphas <- ggplot() +
+    geom_sf(data = hexes |> 
+              mutate(hexid = as.character(hexid)) |> 
+              cbind(predCAR_B = CAR_df |> filter(date == week) |> pull(var = "mean")) |> 
+              st_transform(crs = 26915),
+            aes(fill = predCAR_B))+
+    scale_fill_viridis_b(option = color_option,
+                         # name = "Estimated Infections/1000/week",
+                         direction = -1,
+                         breaks = breaks_plt,
+                         labels = labels_plt,
+                         limits = limits_plt,
+    )+
+    # scale_fill_viridis_b(option = color_option,
+    #                      n.breaks = 10,
+    #                      direction = -1)+
+    theme_minimal()+
+    guides(fill = guide_bins(title = "Trend surface estimated infections per capita/100k",
+                             title.position = "top",
+                             title.vjust = 0.5))+
+    theme(legend.position = "bottom",
+          legend.title.position = "top",
+          legend.key.width = grid::unit(1, "cm"))+
+    coord_sf(xlim = st_bbox(hexes |> 
+                              st_transform(crs = 26915))[c(1,3)],
+             ylim = st_bbox(hexes |> 
+                              st_transform(crs = 26915))[c(2,4)])
+  
+  library(patchwork)
+  # plot <- (plot_infections | plot_alphas)
+  plot <- plot_alphas
+  
+  if(plot_img){
+    plot <- plot &
+      labs(tag = paste("Week:", week))
+  }
+  
+  # # Save the plot as a temporary file
+  tmp_file <- tempfile(fileext = ".png")
+  ggsave(tmp_file, plot, width = 16, height = 9)
+  
+  # Return the temporary file path
+  return(tmp_file)
+}
+
+weeks <- sort(unique(CAR_df$date))
+
+## Size of gifs, in days
+
+size <- 63
+
+weeks_alpha <- seq.Date(from = (alpha_peak - size),
+                        to = (alpha_peak + size),
+                        by = "week")
+
+weeks_delta <- seq.Date(from = (delta_peak - size),
+                        to = (delta_peak + size),
+                        by = "week")
+
+weeks_plt <- weeks[which(weeks %in% weeks_delta)]
+
+hexes <- hexes |> 
+  filter(as.integer(hexid) < 7662)
+
+frame_files <- lapply(weeks_plt, 
+                      plt_fun, 
+                      hexes,
+                      bind_rows(CAR_list),
+                      TRUE)
+
+frame_files <- frame_files |> 
+  unlist()
+
+animation5 <- magick::image_animate(magick::image_read(frame_files), 
+                                   # delay = 1,
+                                   fps = 10, ## Change to a bigger number to a higher rate of fps and vice-versa
+                                   optimize = T)
+animation5
+
+# Specify the output file path, the pattern nomenclature should be: daily_hex_tsa_preomicron.gif, if doing daily gif over some specific periods. DO NOT DO DAILY GIF FOR THE WHOLE PRE-OMICRON PERIOD! Or weekly_hex_tsa_preomicron.gif and weekly_hex_tsa_omicronera.gif for the gif over the entirety of both datasets
+
+output_file <- "img/extra_figures/tsa_alpha_fps10.gif"
+
+# Save the GIF animation
+magick::image_write(animation5, output_file)
+
+
+magick::image_write_gif(image = animation5, 
+                        path = output_file,
+                        # delay = 1/10 # frame per second inverse
+                        )
+
+output_file <- "img/extra_figures/tsa_alpha_fps10.mp4"
+
+magick::image_write_video(image = animation5, 
+                        path = output_file,
+                        delay = 1/10 # frame per second inverse
+)
+
+#
+
 

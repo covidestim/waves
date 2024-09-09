@@ -44,7 +44,7 @@ neighbors <- read_csv(
 
 # ps("Reading {.file {args$alphas}}")
 alphas <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_omicronera_mainNEW.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_reformat_preomicron_mainNEW.csv",
   col_types = cols_only(
     i = col_character(), j = col_character(),
     date_week = col_date(),
@@ -57,7 +57,7 @@ alphas <- read_csv(
 
 # ps("Reading {.file {args$observations}}")
 observations <- read_csv(
-  "data-products/geo-hexes/hexid-observations_omicronera.csv",
+  "data-products/geo-hexes/hexid-observations_preomicronNEW.csv",
   col_types = cols(
     hexid = col_character(),
     date = col_date(),
@@ -101,7 +101,7 @@ neighbors_with_associated_geos <-
 # ps("Forming intra-geo vectors")
 from_j_to_i <- 
   mutate(neighbors_with_associated_geos, j_to_i = i_geo - j_geo) %>%
-  select(i, j, j_to_i, j_geo)
+  select(i, j, j_to_i, i_geo, j_geo)
 # pd()
 
 # ps("Joining alphas to neighbors library")
@@ -118,8 +118,8 @@ joined <- inner_join(from_j_to_i, alphas, by = c("i", "j"))
 # ps("Computing mean vector for every {.code i,date} combination")
 vector_mean <- joined %>% 
   # ## filtering to only show alphas >0, and the maximum value between a_ij and a_ji
-  # filter(alpha>0, alpha == max(alpha),
-  #        .by = c(j,date_week)) %>%
+  filter(alpha>0, alpha == max(alpha),
+         .by = c(j,date_week)) %>%
   as_tibble %>%
   mutate(
     j_geo_x  = st_coordinates(j_geo)[,"X"],

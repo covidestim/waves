@@ -20,7 +20,7 @@ library(docopt)
 # args <- docopt(doc, version = 'transformResults_weekly.R 0.1')
 
 d <- read_csv(
-  "data-products/geo-hexes/mixedmodel/alphas_weekly_omicronera_mainNEW.csv",
+  "data-products/geo-hexes/mixedmodel/alphas_weekly_preomicron_mainNEW.csv",
   col_types = cols(
     interactionTerm = col_character(),
     `(Intercept)` = col_number()
@@ -37,9 +37,13 @@ d1 <- rename(d, alpha=interactionTerm, value=`(Intercept)`) |>
     value # backwards-compatibility, for now
   ) |>
   # Creating a date using the month and week
-  mutate(date_week = floor_date(ymd(date) + (week - week(date))*7,
+  mutate(date_week = floor_date(ymd(date) + (week - week(date) - 1)*7,
                                 unit = "week", 
-                                week_start = "Thursday"))
+                                week_start = "Thursday"),
+         date_week2 = floor_date(ymd(date) + (week - week(date))*7,
+                                unit = "week", 
+                                week_start = "Thursday"),
+         date_week3 = date_in_week(year = year(date), week = week, weekday = 5))
 
 d1_with_normalized <- d1 |>  
   ## Should be grouped by i, not by j
