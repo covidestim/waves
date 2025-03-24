@@ -5,6 +5,7 @@ library(tidyverse)
 library(sf)
 library(spdep)
 library(spatialreg)
+library(Matrix)
 
 ## 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
@@ -41,13 +42,13 @@ hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_p
   left_join(hexes, by = "hexid")
 
 # ## Omicron-era
-hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
-  mutate(hexid = as.character(hexid),
-         date = as.Date(date)) |>
-  # select(-geometry) |>
-  # mutate(infectionsPC = (infections/population)*1e5) |>
-  filter(infectionsPC >= 1) |>
-  left_join(hexes, by = "hexid")
+# hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
+#   mutate(hexid = as.character(hexid),
+#          date = as.Date(date)) |>
+#   # select(-geometry) |>
+#   # mutate(infectionsPC = (infections/population)*1e5) |>
+#   filter(infectionsPC >= 1) |>
+#   left_join(hexes, by = "hexid")
 
 ## Population hexes
 hex_population <- vroom::vroom("data-products/geo-hexes/hexid-population.csv")
@@ -65,40 +66,40 @@ hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
   mutate(Time = as.numeric(date - min(date)) + 1,
          ID = as.numeric(hexid))
 
-# ## Omicro-era dataset
-hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
-                             date = seq.Date(from = min(hexgrid_omicronera$date),
-                                             to = max(hexgrid_omicronera$date), 
-                                             by = "day")) |>
-  left_join(hex_population |>
-              mutate(hexid = as.factor(hexid))) |>
-  left_join(hexgrid_omicronera |>
-              select(-geometry)) |>  ## just join the desired columns, we have the geometry
-  # st_as_sf()|>
-  # dividing by 7 to make it an average of the week
-  dplyr::mutate(across(starts_with("infections"), ~.x/7))
+# # ## Omicro-era dataset
+# hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
+#                              date = seq.Date(from = min(hexgrid_omicronera$date),
+#                                              to = max(hexgrid_omicronera$date), 
+#                                              by = "day")) |>
+#   left_join(hex_population |>
+#               mutate(hexid = as.factor(hexid))) |>
+#   left_join(hexgrid_omicronera |>
+#               select(-geometry)) |>  ## just join the desired columns, we have the geometry
+#   # st_as_sf()|>
+#   # dividing by 7 to make it an average of the week
+#   dplyr::mutate(across(starts_with("infections"), ~.x/7))
 
-hex_spacetime <- hex_spacetime |> 
-  select(hexid, date, infectionsPC) |> 
-  pivot_wider(names_from = hexid, values_from = infectionsPC) |> 
-  ## Stretching the time series to a daily basis, as the data is the sum of week infections estimates
-  dplyr::mutate(across(where(is.numeric), ~zoo::na.approx(.x, maxgap = 6))) |> 
-  ## Going back to longer format
-  pivot_longer(cols = -date, names_to = "hexid", values_to = "infectionsPC") |> 
-  mutate(Time = as.numeric(date - min(date)) + 1,
-         ID = as.numeric(hexid))
+# hex_spacetime <- hex_spacetime |> 
+#   select(hexid, date, infectionsPC) |> 
+#   pivot_wider(names_from = hexid, values_from = infectionsPC) |> 
+#   ## Stretching the time series to a daily basis, as the data is the sum of week infections estimates
+#   dplyr::mutate(across(where(is.numeric), ~zoo::na.approx(.x, maxgap = 6))) |> 
+#   ## Going back to longer format
+#   pivot_longer(cols = -date, names_to = "hexid", values_to = "infectionsPC") |> 
+#   mutate(Time = as.numeric(date - min(date)) + 1,
+#          ID = as.numeric(hexid))
 
 ## Rerun setting up
 ## Pre-Omicron
-CAR_df_rerun <- vroom::vroom("data-products/tsa_preomicron.csv") 
+# CAR_df_rerun <- vroom::vroom("data-products/tsa_preomicron.csv") 
 
 ## Omicron-era
 # CAR_df_rerun <- vroom::vroom("data-products/tsa_omicronera.csv") 
 
 ## Returning the data.frame into a list format
-CAR_list_rerun <- CAR_df_rerun |> 
-  group_split(date) |> 
-  as.list()
+# CAR_list_rerun <- CAR_df_rerun |> 
+#   group_split(date) |> 
+#   as.list()
 
 ## Reruns accouting
 ## 499:628 ok!
@@ -136,106 +137,104 @@ compute_list <- control.compute(hyperpar = T,
 
 predictor_list <- control.predictor(compute = T)
 
+CAR_hyper_list <- list()
+
 for (i in 1:length(weeks)) {
   
-  ## Checking if it is a rerun
-  if(is.rerun){
-    ## Dates to rerun
-    if(is.na(dates_to_rerun[[i]])){next} 
-    
-    ## Making counter, if the model has as a median of sd for fitted values that it is less than 10,
-    ## after 10 iterations means the date is a not super variable date, so the model is write
-    counter <- 0
-    while (exp(median(CAR_list[[i]]$sd) < 10 && counter <= 10)) {
-      hex_spacetime_sp <- hex_spacetime |> 
-        filter(date == weeks[[i]]) |> 
-        mutate(infectionsPC = infectionsPC) ## To deal with the variance on the input data from InfectionsPC at Omicron-era dataset
-      
-      cat("Initializing model for week:", as.character(weeks[i]),"  \n", sep = " ")
-      
-      ## Handling errors even if after successive runs
-      tryCatch({
-        ## Setting seeds to reproducibility
-        set.seed(.Random.seed)
-        
-        CAR_model <- inla(formula = as.formula(infectionsPC ~ 1+
-                                                 f(ID, 
-                                                   model = "bym2",
-                                                   graph = wt_W)),
-                          data = as.data.frame(hex_spacetime_sp),
-                          # offset = log(population),
-                          family = "gaussian",
-                          verbose = T,
-                          control.compute = compute_list,
-                          control.predictor = predictor_list)}, 
-        error = {
-          ## Setting seeds to reproducibility
+  ## filtering the dataset to a specific date
+  hex_spacetime_sp <- hex_spacetime |> 
+    filter(date == weeks[i]) |> 
+    mutate(infections = as.integer(infections))
+  
+  cat("Fitting a first try model \n")
+  
+  # counter <- 1
+  cat("Initializing model for week:", as.character(weeks[i]),"  \n", sep = " ")
+  
+  counter <- 1
+  sd_values <- 0
+  while (median(sd_values) < 10 && counter < 10) {
+        ## Handling errors even if after successive runs
+        tryCatch({
+          ## Setting random seeds to avoid problemns of convergence for bad seeds
           set.seed(.Random.seed)
-          
+
           CAR_model <- inla(formula = as.formula(infectionsPC ~ 1+
                                                    f(ID, 
-                                                     model = "bym2",
-                                                     graph = wt_W)),
+                                                     model = "bym2", 
+                                                     graph = hexes_nb,
+                                                     scale.model = TRUE,
+                                                     constr = TRUE,
+                                                     hyper = list(phi = list(prior = "pc",
+                                                                             param = c(0.5 , 2/3),
+                                                                             initial = -3),
+                                                                  prec = list (prior = "pc.prec",
+                                                                               param = c(0.2/0.31, 0.01),
+                                                                               initial = 5))
+                                                     )
+                                                 ),
                             data = as.data.frame(hex_spacetime_sp),
                             # offset = log(population),
                             family = "gaussian",
                             verbose = T,
                             control.compute = compute_list,
-                            control.predictor = predictor_list)})
-      
-      CAR_list[[i]] <- cbind(hex_spacetime_sp, 
-                             CAR_model$summary.fitted.values |> 
-                               rownames_to_column(var = "INLApred")
-      )
-      
-      counter = counter + 1
+                            control.predictor = predictor_list)},
+          error = {
+            ## Setting random seeds to avoid problems of convergence for bad seeds
+            set.seed(.Random.seed)
+
+            CAR_model <- inla(formula = as.formula(infectionsPC ~ 1+
+                                                     f(ID,
+                                                       model = "bym2",
+                                                       graph = wt_W)),
+                              data = as.data.frame(hex_spacetime_sp),
+                              # offset = log(population),
+                              family = "gaussian",
+                              verbose = T,
+                              control.compute = compute_list,
+                              control.predictor = predictor_list)})
+    
+    # sd_values <- CAR_model$summary.fitted.values$sd
+    ## Uncomment if you wanna skip the while loop
+    sd_values <- 11
+    
+    ## The last resort, brute force
+    if(counter == 10 && median(sd_values) < 10){
+      ## Last resort
+      CAR_model <- inla(formula = as.formula(log(infectionsPC) ~ 1+
+                                               f(ID,
+                                                 model = "bym2",
+                                                 graph = wt_W)),
+                        data = as.data.frame(hex_spacetime_sp),
+                        # offset = log(population),
+                        family = "gaussian",
+                        verbose = T,
+                        control.compute = compute_list,
+                        control.predictor = predictor_list)
     }
-  }else{
-    hex_spacetime_sp <- hex_spacetime |> 
-      filter(date == "2022-01-20")|> 
-      # mutate(infectionsPC = infectionsPC/1e5) |>
-      left_join(hexes_centroids) |> 
-      mutate(scaled_X = scale(X),
-             scaled_Y = scale(Y),
-             scaled_XY = scale(X*Y),
-             scaled_XX = scale(X*X), 
-             scaled_YY = scale(Y*Y))
     
-    cat("Fitting a first try model \n")
-    
-    ## Setting seeds to reproducibility
-    set.seed(.Random.seed)
-    
-    counter <- 1
-    cat("Initializing model for week:", as.character(weeks[i]),"  \n", sep = " ")
-    
-    CAR_model <- inla(formula = as.formula(log(infectionsPC) ~ 1+
-                                             # scaled_X + scaled_Y + scaled_XY +
-                                             # scaled_XX + scaled_YY +
-                                             f(ID, 
-                                               model = "bym2",
-                                               graph = wt_W)),
-                      data = as.data.frame(hex_spacetime_sp),
-                      # offset = log(population),
-                      family = "gaussian",
-                      verbose = T,
-                      control.compute = compute_list,
-                      control.predictor = predictor_list)
-    
-    CAR_list[[i]] <- cbind(hex_spacetime_sp, 
-                           CAR_model$summary.fitted.values |> 
-                             rownames_to_column(var = "INLApred")
-    )
+    cat("Attempt ", counter, "! \n", sep = "")
+    counter = counter + 1
   }
+  # }
   
-  rm(hex_spacetime_sp, CAR_model)
+  CAR_list[[i]] <- cbind(hex_spacetime_sp, 
+                         CAR_model$summary.fitted.values |> 
+                           rownames_to_column(var = "INLApred")
+  )
   
-  cat("Finished CAR model for week ", as.character(weeks[i]),"! \n", 
-      "And the counter went until: ", counter, "\n", sep = "")
+  ## To keep the phi hyperparameter and check how it varied over time
+  CAR_hyper_list[[i]] <- cbind(phi = CAR_model$summary.hyperpar$mean,
+                               date = as.Date(weeks[i], "%Y-%m-%d"))
+  
+  # rm(hex_spacetime_sp, CAR_model)
+  
+  cat("Finished BYM2 model for week ", as.character(weeks[i]),"! \n", 
+      "With ", counter, " Attempts! \n",sep = "")
 }
 
 ## List to rerun if the model is not well fitted to the data
-dates_to_rerun <- lapply(CAR_list, function(x){ifelse(median(exp(x$sd*1e5))<10, x$date, NA)})
+dates_to_rerun <- lapply(CAR_list, function(x){ifelse(median(x$sd)<10, x$date, NA)})
 
 ## Rerun flag, set this to TRUE is the dates to rerun are a lot to get better model estimates
 is.rerun <- TRUE
@@ -247,7 +246,7 @@ CAR_list <- lapply(CAR_list, function(x){x <- x |> mutate(hexid = as.integer(hex
 CAR_df <- bind_rows(CAR_list)
 
 ## Saving the df, remember to change the name if the dataset is "preomicron" or "omicronera". The pattern nomenclature to files are tsa_preomicron.csv or tsa_omicronera.csv
-dataset <- "omicronera"
+dataset <- "new_rerun_preomicron"
 
 vroom::vroom_write(x = CAR_df, 
                    file = paste0("data-products/tsa_", 
@@ -259,35 +258,53 @@ vroom::vroom_write(x = CAR_df,
 
 ## Prototyping codes to check model convergence and plots
 
+# Use 4 cores to process marginals in parallel
+library("parallel")
+options(mc.cores = 4)
+# Transform marginals and compute posterior mean
+#marginals: List of `marginals.fitted.values`from inla model
+tmarg <- function(marginals) {
+  post.means <- mclapply(marginals, function (marg) {
+    # Transform post. marginals
+    aux <- inla.tmarginal(exp, marg)
+    # Compute posterior mean
+    inla.emarginal(function(x) x, aux)
+  })
+  
+  return(as.vector(unlist(post.means)))
+}
+
+# fitted_values <- inla.tmarginal(exp, CAR_model$marginals.fitted.values)
+color_option <- "magma"
+na_color <- "grey70"
 ## Breakdowns of each peaks
 breaks_plt <- c(0,seq(150,300, 20))
 labels_plt <- c("150< ",seq(150,280, 20), ' >300')
 limits_plt <- c(0,350)
-color_option <- "magma"
-na_color <- "grey70"
 
 ggplot(data = hexes |> 
-         cbind(predCAR_B = CAR_model$summary.fitted.values |> pull(var = mean)) |> 
+         cbind(predCAR = CAR_model$summary.fitted.values |> pull(var = mean)) |> 
          st_transform(crs = 26915)) +
-  geom_sf(aes(fill = predCAR_B))+
-  # scale_fill_viridis_b(option = color_option,
-  #                      name = "Estimated Infections/100k/week",
-  #                      direction = -1,
-  #                      breaks = breaks_plt,
-  #                      labels = labels_plt,
-  #                      limits = limits_plt,
-  # )+
-  scale_fill_viridis_b(option = "magma",
-                       n.breaks = 10,
-                       labels = scales::label_comma(),
-                       direction = -1)+
+  geom_sf(aes(fill = predCAR))+
+  scale_fill_viridis_b(option = color_option,
+                       name = "Estimated Infections/100k/week",
+                       direction = -1,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt
+  )+
+  # scale_fill_viridis_b(option = "magma",
+  #                      n.breaks = 10,
+  #                      labels = scales::label_comma(),
+  #                      direction = -1)+
   theme_minimal()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1, "cm"))+
-  guides(fill = guide_bins(title = "Trend surface estimated infections per capita/100k",
+  guides(fill = guide_bins(title = "Infections per capita/100k",
                            title.position = "top",
                            title.vjust = 0.5))+
   labs(title = "Prediction from CAR model with proportional* weights",
        subtitle = "CAR model with BYM2 implementation",
        caption = "*Proportional weights means weights ranging from 1 to 0")
+

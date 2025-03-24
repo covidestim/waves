@@ -46,33 +46,33 @@ preomicron_week <- covidestim_observation |>
           infectionsPC = round(sum(infectionsPC, na.rm = T),2),
           .by = c("fips", "date_week"))
 
-omicronera_week <- omicronera_observation |> 
-  rename(date_week = date) |> 
-  reframe(cases = sum(cases, na.rm = T),
-          Rt = round(mean(Rt, na.rm = T), 3),
-          infections = round(sum(infections, na.rm = T), 2),
-          infectionsPC = round(sum(infectionsPC, na.rm = T),2),
-          .by = c("fips", "date_week"))
+# omicronera_week <- omicronera_observation |> 
+#   rename(date_week = date) |> 
+#   reframe(cases = sum(cases, na.rm = T),
+#           Rt = round(mean(Rt, na.rm = T), 3),
+#           infections = round(sum(infections, na.rm = T), 2),
+#           infectionsPC = round(sum(infectionsPC, na.rm = T),2),
+#           .by = c("fips", "date_week"))
 
-covidestim <- rbind(preomicron_week, 
-                    omicronera_week) |> 
-  left_join(population) |> 
-  mutate(infectionsPC_new = round((infections/population)*1e5, 2),
-         date_week = as.Date(date_week, "%Y-%m-%d"))
+# covidestim <- rbind(preomicron_week, 
+#                     omicronera_week) |> 
+#   left_join(population) |> 
+#   mutate(infectionsPC_new = round((infections/population)*1e5, 2),
+#          date_week = as.Date(date_week, "%Y-%m-%d"))
 
 ## Fig.1 Patterns of synchronization
 fig1_data <- us_counties |> 
-  left_join(covidestim,
+  left_join(preomicron_week,
             by = c("GEOID" = "fips"))
 
-dates <- unique(covidestim$date_week)
+dates <- unique(fig1_data$date_week)
 
 ## Date of maximum infections per capita at national level
-sum_infections <- covidestim |> 
+sum_infections <- preomicron_week |> 
   reframe(infectionsPC = sum(infectionsPC, na.rm = T)/7,
           .by = "date_week") |> 
   arrange(desc(date_week)) |> 
-  filter(date_week <= "2021-12-01")
+  filter(date_week <= "2021-12-31")
 
 ## Peaks
 ## Ten most dates with infectionsPC
@@ -665,7 +665,7 @@ ggsave(plot = pop_zoom,
 ## Hexgrid plots
 # high <- "deeppink1"
 # low <- "thistle1"
-palette <- "Mako"
+palette <- "Purple-Yellow"
 
 us_hex_plt <- ggplot() + 
   geom_sf(hexpop |> 
@@ -674,16 +674,20 @@ us_hex_plt <- ggplot() +
                       color = log10(population+1))) +
   geom_sf(us_states,
           mapping=aes(),
-          color = "deeppink1",
+          color = "deeppink4",
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Population",
-                                               rev = F,
-                                               breaks = seq(1,6,1),
+                                               # rev = F,
+                                               breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               # guide = guide_colorsteps(),
+                                               limits = c(1,7),
                                                palette = palette)+
-  colorspace::scale_color_continuous_sequential(palette = palette,
-                                                rev = F)+
+  colorspace::scale_color_continuous_sequential(name = "Population",
+                                                # rev = F,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7),
+                                                palette = palette)+
   theme_minimal()+
   guides(color = "none")+
   theme(legend.position = "bottom", 
@@ -715,16 +719,20 @@ new_england_hex_plt <- ggplot()+
                       color = log10(population+1)))+ 
   geom_sf(new_england_states,
           mapping=aes(),
-          color = "deeppink1",
+          color = "deeppink4",
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Population",
-                                               rev = F,
-                                               breaks = seq(1,6,1),
+                                               # rev = F,
+                                               breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               # guide = guide_colorsteps(),
+                                               limits = c(1,7),
                                                palette = palette)+
-  colorspace::scale_color_continuous_sequential(palette = palette,
-                                                rev = F)+
+  colorspace::scale_color_continuous_sequential(name = "Population",
+                                                # rev = F,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7),
+                                                palette = palette)+
   theme_minimal()+
   guides(color = "none")+
   theme(legend.position = "bottom", 
@@ -750,19 +758,26 @@ ct_hex_plt <- ggplot()+
                       color = log10(population+1)))+ 
   geom_sf(ct_counties,
           mapping=aes(),
-          color = "deeppink1",
+          color = "deeppink4",
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Population",
-                                               rev = F,
-                                               breaks = seq(1,6,1),
+                                               # rev = F,
+                                               breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               # guide = guide_colorsteps(),
+                                               limits = c(1,7),
                                                palette = palette)+
-  colorspace::scale_color_continuous_sequential(palette = palette,
-                                                rev = F)+
+  colorspace::scale_color_continuous_sequential(name = "Population",
+                                                # rev = F,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7),
+                                                palette = palette)+
   theme_minimal()+
   guides(color = "none")+
-  theme(legend.position = "none",
+  theme(legend.position = "bottom", 
+        legend.key.width = grid::unit(2, "cm"),
+        legend.title.position = "top",
+        legend.title = element_text(hjust = 0.5),
         axis.text = element_text(size = 6))
 ct_hex_plt
 
@@ -823,68 +838,90 @@ hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_p
   left_join(hexes, by = "hexid") |>
   sf::st_as_sf()
 
-# ## Omicron-era
-hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
+hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv")
+
+hexes <- sf::st_read("data-products/geo-hexes/hexes.shp")
+
+hexpop <- sf::st_read("data-products/geo-hexes/hexid-population.shp")
+
+hexgrid_preomicron_cum <- hexgrid_preomicron |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
-  # select(-geometry) |>
-  # mutate(infectionsPC = (infections/population)*1e5) |>
-  filter(infectionsPC >= 1) |>
-  left_join(hexes, by = "hexid") |>
-  sf::st_as_sf()
+  # ungroup() |> 
+  # select(-geometry, -population, -infectionsPC) |>
+  group_by(hexid) |> 
+  summarise(cum_infections = sum(infections, na.rm = T)) |> 
+  left_join(hexpop|> 
+              # st_drop_geometry() |> 
+              mutate(hexid = as.character(hexid))) |> 
+  mutate(cum_infectionsPC = (cum_infections/population)*1e5) |>
+  filter(cum_infectionsPC >= 1) |>
+  # right_join(hexes) |>
+  sf::st_as_sf() |> 
+  st_transform(crs = 'ESRI:102009')
+
+# ## Omicron-era
+# hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
+#   mutate(hexid = as.character(hexid),
+#          date = as.Date(date)) |>
+#   # select(-geometry) |>
+#   # mutate(infectionsPC = (infections/population)*1e5) |>
+#   filter(infectionsPC >= 1) |>
+#   left_join(hexes, by = "hexid") |>
+#   sf::st_as_sf()
+
+alpha_peak <- as.Date("2020-11-19")
+delta_peak <- as.Date("2021-09-08")
 
 ## Hexes joining with the county information
 hexgrid_infections <- hexgrid_preomicron |> 
-  filter(date == as.Date("2020-11-26")-21) |> ## Alpha peak
+  filter(date == alpha_peak) |> ## Alpha peak
   left_join(hexes_to_county |> select(hexid, fips) |> mutate(hexid = as.character(hexid))) |> 
   mutate(STATEFP = str_sub(fips, 1, 2)) |> 
   st_transform(crs = 'ESRI:102009')
 
-hexes <- hexes |> 
-  filter(as.integer(hexid) < 7662) |> 
-  left_join(hexes_to_county |> 
-              select(hexid, fips) |> 
-              mutate(hexid = as.character(hexid))) |> 
-  mutate(STATEFP = str_sub(fips, 1, 2)) |> 
+hexes <- hexes |>
+  filter(as.integer(hexid) < 7662) |>
+  left_join(hexes_to_county |>
+              select(hexid, fips) |>
+              mutate(hexid = as.character(hexid))) |>
+  mutate(STATEFP = str_sub(fips, 1, 2)) |>
   st_transform(crs = 'ESRI:102009')
 
-breaks_plt <- seq(1,1001, 100)
-labels_plt <- c("1>", seq(100,900, 100), '1,000+')
-limits_plt <- c(0,1000)
-color_option <- "magma"
+# breaks_plt <- seq(1,1001, 100)
+# labels_plt <- c("1>", seq(100,900, 100), '1,000+')
+# limits_plt <- c(0,1000)
+color_option <- "Inferno"
 
 ### Pre-Omicron
 us_hex_infections <- ggplot() + 
-  geom_sf(data = hexes,
+  geom_sf(data = hexes|>
+            filter(as.integer(hexid) < 7662) |>
+            st_transform(crs = 'ESRI:102009'),
           fill = 'transparent')+
-  geom_sf(hexgrid_infections |> 
-            filter(!is.na(infectionsPC)), 
-          mapping=aes(fill = infectionsPC, 
-                      color = infectionsPC)) +
+  geom_sf(hexgrid_preomicron_cum |> 
+            filter(!is.na(cum_infections))|> 
+            st_transform(crs = 'ESRI:102009'), 
+          mapping=aes(fill = log10(cum_infections+1), 
+                      color = log10(cum_infections+1))) +
   geom_sf(us_states,
           mapping=aes(),
-          color = "deeppink2",
+          color = "thistle1",
           fill = "transparent")+
-  scale_fill_viridis_c(option = color_option,
-                       name = "Estimated Infections/100k",
-                       na.value = "grey80",
-                       direction = -1,
-                       breaks = breaks_plt,
-                       labels = labels_plt,
-                       limits = limits_plt,
-                       oob = scales::squish)+
-  scale_color_viridis_c(option = color_option,
-                        name = "Estimated Infections/100k",
-                        na.value = "grey80",
-                        direction = -1,
-                        breaks = breaks_plt,
-                        labels = labels_plt,
-                        limits = limits_plt,
-                        oob = scales::squish)+
+  colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections",
+                                               # rev = F,
+                                               breaks = seq(1,7,1),
+                                               labels = scales::label_math(),
+                                               limits = c(1,7),
+                                               palette = color_option)+
+  colorspace::scale_color_continuous_sequential(name = "Cumulative Infections",
+                                                # rev = F,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7),
+                                                palette = color_option)+
   theme_minimal()+
-  guides(color = "none",
-         fill = guide_coloursteps(title.position = "top",
-                                  title.vjust = 0.5))+
+  guides(color = "none")+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
@@ -935,7 +972,7 @@ ggsave(filename = "img/extra_figures/fig2e.png",
 #   theme(legend.position = "bottom")
 # us_hex_infections
 
-new_england_grid_infections <- hexgrid_infections |> 
+new_england_grid_infections <- hexgrid_preomicron_cum |> 
   filter(STATEFP %in% c("09","23","25","33","44","50"))
 
 new_england_hexes <- hexes |> 
@@ -952,26 +989,20 @@ new_england_hex_infections <- ggplot() +
           mapping=aes(),
           color = "deeppink2",
           fill = "transparent")+
-  scale_fill_viridis_c(option = color_option,
-                       name = "Estimated Infections/100k",
-                       na.value = "grey80",
-                       direction = -1,
-                       breaks = breaks_plt,
-                       labels = labels_plt,
-                       limits = limits_plt,
-                       oob = scales::squish)+
-  scale_color_viridis_c(option = color_option,
-                        name = "Estimated Infections/100k",
-                        na.value = "grey80",
-                        direction = -1,
-                        breaks = breaks_plt,
-                        labels = labels_plt,
-                        limits = limits_plt,
-                        oob = scales::squish)+
+  colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections",
+                                               rev = F,
+                                               breaks = seq(1,7,1),
+                                               labels = scales::label_math(),
+                                               limits = c(1,7),
+                                               palette = color_option)+
+  colorspace::scale_color_continuous_sequential(name = "Cumulative Infections",
+                                                rev = F,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7),
+                                                palette = color_option)+
   theme_minimal()+
-  guides(color = "none",
-         fill = guide_coloursteps(title.position = "top",
-                                  title.vjust = 0.5))+
+  guides(color = "none")+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
