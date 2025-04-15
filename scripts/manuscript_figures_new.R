@@ -19,13 +19,13 @@ excludes = c(
   "43", "72", "74", "78", "79", "15", "11"
 )
 
-cbgpop <- sf::st_read("data-products/geo-hexes/cbg_population.shp")
-
-hexpop <- sf::st_read("data-products/geo-hexes/hexid-population.shp")
+hexpop <- sf::st_read("data-products/geo-hexes/meta_population/hexid-population_new.shp")|> 
+  st_transform(crs = 26915)
 
 us_states <- tigris::states(cb = T) |> 
   dplyr::filter(!STATEFP %in% excludes) |> 
-  tigris::shift_geometry()
+  tigris::shift_geometry()|> 
+    st_transform(crs = 26915)
 
 # ## Highways
 # highways <- tigris::primary_roads(year = 2024) |> 
@@ -36,12 +36,11 @@ us_states <- tigris::states(cb = T) |>
 new_england_states <- us_states |> 
   dplyr::filter(GEOID %in% c("09","23","25","33","44","50"))
 
-new_england_counties <- tigris::counties(state = c("09","23","25","33","44","50"))
+new_england_counties <- tigris::counties(state = c("09","23","25","33","44","50"))|> 
+  st_transform(crs = 26915)
 
-ct_counties <- tigris::counties(state = 09)
-
-# cbgpop <- sf::st_transform(cbgpop, crs = 26915)
-us_states <- sf::st_transform(us_states, crs = 26915)
+ct_counties <- tigris::counties(state = 09)|> 
+  st_transform(crs = 26915)
 
 ## Hexgrid plots
 # high <- "deeppink1"
@@ -49,29 +48,38 @@ us_states <- sf::st_transform(us_states, crs = 26915)
 palette <- "Purple-Yellow"
 
 us_hex_plt <- ggplot() + 
+  geom_sf(data = hexes|>
+            filter(as.integer(hexid) < 7662) |>
+            st_transform(crs = 'ESRI:102009'),
+          fill = 'transparent')+
   geom_sf(hexpop |> 
             filter(!is.na(population)), 
-          mapping=aes(fill = log10(population+1),
-                      color = "")) +
+          mapping=aes(fill = log10(population+1))) +
   geom_sf(us_states,
           mapping=aes(),
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
-  colorspace::scale_fill_continuous_sequential(name = "Population (log10 scale)",
-                                               na.value = "transparent",
-                                               # rev = F,
+  colorspace::scale_fill_continuous_sequential(name = "Population\n(log scale)",
+                                               palette = palette,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               limits = c(1,7),
-                                               palette = palette)+
-  scale_colour_manual(values=NA) +              
+                                               limits = c(1,7))+
+  colorspace::scale_color_continuous_sequential(name = "Population\n(log scale)",
+                                                palette = palette,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7))+
+  # khroma::scale_color_smoothraibow(name = "Population\n(log scale)",
+  #                            reverse = T,
+  #                            breaks = seq(1,7,1),
+  #                            limits = c(1,7))+
   theme_minimal()+
+  guides(color = "none")+
   theme(legend.position = "bottom", 
-        legend.key.width = grid::unit(3, "cm"),
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
-        axis.text = element_text(size = 6))+
-  guides(colour="none")
+        legend.key.width = grid::unit(3, "cm"),
+        axis.text = element_text(size = 6))
 us_hex_plt
 
 ggsave(plot = us_hex_plt,
@@ -80,6 +88,7 @@ ggsave(plot = us_hex_plt,
        height = 9,
        dpi = 100)
 
+## hexes to county columns
 hexes_to_county <- vroom::vroom("data-products/geo-hexes/hexid-fips-map.csv")
 
 hexpop <- hexpop |> 
@@ -89,30 +98,39 @@ hexpop <- hexpop |>
 new_england_hexpop <- hexpop |> 
   filter(STATEFP %in% c("09","23","25","33","44","50"))
 
+new_england_states <- us_states|> 
+  filter(STATEFP %in% c("09","23","25","33","44","50"))
+
 new_england_hex_plt <- ggplot()+
   geom_sf(new_england_hexpop |> 
             filter(!is.na(population)),
-          mapping=aes(fill= log10(population+1),
-                      color = ""))+ 
+          mapping=aes(fill= log10(population+1)))+ 
   geom_sf(new_england_states,
           mapping=aes(),
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
-  colorspace::scale_fill_continuous_sequential(name = "Population (log10 scale)",
-                                               na.value = "transparent",
-                                               # rev = F,
+  colorspace::scale_fill_continuous_sequential(name = "Population\n(log scale)",
+                                               palette = palette,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               limits = c(1,7),
-                                               palette = palette)+
-  scale_colour_manual(values=NA) +              
+                                               limits = c(1,7))+
+  colorspace::scale_color_continuous_sequential(name = "Population\n(log scale)",
+                                                palette = palette,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7))+
+  # khroma::scale_fill_smoothrainbow(name = "Population\n(log scale)",
+  #                            reverse = F,
+  #                            breaks = seq(1,7,1),
+  #                            labels = scales::label_math(),
+  #                            limits = c(1,7))+
   theme_minimal()+
+  guides(color = "none")+
   theme(legend.position = "bottom", 
-        legend.key.width = grid::unit(3, "cm"),
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
-        axis.text = element_text(size = 6))+
-  guides(colour="none")
+        legend.key.width = grid::unit(3, "cm"),
+        axis.text = element_text(size = 6))
 new_england_hex_plt
 
 ggsave(plot = new_england_hex_plt,
@@ -124,30 +142,39 @@ ggsave(plot = new_england_hex_plt,
 ct_hexpop <- hexpop |> 
   filter(STATEFP %in% c("09"))
 
+ct_counties <- us_counties |> 
+  filter(STATEFP %in% c("09"))
+
 ct_hex_plt <- ggplot()+
   geom_sf(ct_hexpop |> 
             filter(!is.na(population)),
-          mapping=aes(fill = log10(population+1),
-                      color = ""))+ 
+          mapping=aes(fill = log10(population+1)))+ 
   geom_sf(ct_counties,
           mapping=aes(),
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
-  colorspace::scale_fill_continuous_sequential(name = "Population (log10 scale)",
-                                               na.value = "transparent",
-                                               # rev = F,
+  colorspace::scale_fill_continuous_sequential(name = "Population\n(log scale)",
+                                               palette = palette,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               limits = c(1,7),
-                                               palette = palette)+
-  scale_colour_manual(values=NA) +              
+                                               limits = c(1,7))+
+  colorspace::scale_color_continuous_sequential(name = "Population\n(log scale)",
+                                                palette = palette,
+                                                breaks = seq(1,7,1),
+                                                # labels = scales::label_math(),
+                                                limits = c(1,7))+
+  # khroma::scale_fill_smoothrainbow(name = "Population\n(log scale)",
+  #                                  reverse = F,
+  #                                  breaks = seq(1,7,1),
+  #                                  labels = scales::label_math(),
+  #                                  limits = c(1,7))+
   theme_minimal()+
+  guides(color = "none")+
   theme(legend.position = "bottom", 
-        legend.key.width = grid::unit(3, "cm"),
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
-        axis.text = element_text(size = 6))+
-  guides(colour="none")
+        legend.key.width = grid::unit(3, "cm"),
+        axis.text = element_text(size = 6))
 ct_hex_plt
 
 ggsave(filename = "img/extra_figures/fig2c.png",
@@ -157,25 +184,8 @@ ggsave(filename = "img/extra_figures/fig2c.png",
        dpi = 100)
 
 library(patchwork)
-# p1 <- (new_england_hex_plt / ct_hex_plt)+
-#   plot_layout(widths = c(1,1),
-#               guides = "collect",
-#               heights = c(1,1))&
-#   theme(legend.position = "none")
-# p1
-# 
-# ggsave(filename = "img/extra_figures/fig2c.png",
-#        plot = p1, 
-#        width = 16, 
-#        height = 9,
-#        dpi = 100)
-# 
-# ggsave(filename = "img/extra_figures/fig2c.pdf",
-#        plot = p1, 
-#        width = 16, 
-#        height = 9,
-#        dpi = 100)
 
+## Patchwork Population
 hexpop_zoom <- (us_hex_plt | (new_england_hex_plt / ct_hex_plt))+
   plot_layout(widths = c(4,1,1),
               heights = c(4,1,1))+
@@ -196,10 +206,47 @@ ggsave(plot = hexpop_zoom,
        height = 9,
        dpi = 100)
 
-## Infections on Hexes
-hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv")
-
+## 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp")
+
+## Pre-Omicron
+hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
+  mutate(hexid = as.character(hexid),
+         date = as.Date(date)) |>
+  select(-geometry) |>
+  mutate(infectionsPC = (infections/population)*1e5) |>
+  filter(infectionsPC >= 1) |>
+  left_join(hexes, by = "hexid") |>
+  sf::st_as_sf()
+
+hexes_to_county <- vroom::vroom("data-products/geo-hexes/hexid-fips-map.csv")
+
+hexgrid_preomicron_cum <- hexgrid_preomicron |>
+  mutate(hexid = as.character(hexid)) |>
+  group_by(hexid) |> 
+  summarise(cum_infections = sum(infections, na.rm = T)) |> 
+  left_join(hexpop|> 
+              st_drop_geometry() |>
+              mutate(hexid = as.character(hexid))) |> 
+  mutate(cum_infectionsPC = (cum_infections/population)*1e5) |>
+  filter(cum_infectionsPC >= 1)|>
+  sf::st_as_sf() |> 
+  st_transform(crs = 'ESRI:102009')
+
+## Peak dates
+alpha_peak <- as.Date("2020-11-19")
+delta_peak <- as.Date("2021-09-08")
+
+## Hexes joining with the county information
+hexgrid_infections <- hexgrid_preomicron |> 
+  st_drop_geometry() |> 
+  mutate(hexid = as.character(hexid)) |> 
+  filter(date == alpha_peak) |> ## Alpha peak
+  left_join(hexes_to_county |> select(hexid, fips) |> mutate(hexid = as.character(hexid))) |> 
+  mutate(STATEFP = str_sub(fips, 1, 2)) |> 
+  left_join(hexes) |> 
+  st_as_sf() |> 
+  st_transform(crs = 'ESRI:102009')
 
 hexes <- hexes |>
   filter(as.integer(hexid) < 7662) |>
@@ -208,27 +255,6 @@ hexes <- hexes |>
               mutate(hexid = as.character(hexid))) |>
   mutate(STATEFP = str_sub(fips, 1, 2)) |>
   st_transform(crs = 'ESRI:102009')
-
-hexpop <- sf::st_read("data-products/geo-hexes/hexid-population.shp")
-
-hexgrid_preomicron_cum <- hexgrid_preomicron |>
-  mutate(hexid = as.character(hexid),
-         date = as.Date(date)) |>
-  # ungroup() |> 
-  # select(-geometry, -population, -infectionsPC) |>
-  group_by(hexid) |> 
-  summarise(cum_infections = sum(infections, na.rm = T)) |> 
-  left_join(hexpop|> 
-              # st_drop_geometry() |> 
-              mutate(hexid = as.character(hexid))) |> 
-  mutate(cum_infectionsPC = (cum_infections/population)*1e5) |>
-  filter(cum_infectionsPC >= 1) |>
-  right_join(hexes |> st_drop_geometry()) |>
-  sf::st_as_sf() |> 
-  st_transform(crs = 'ESRI:102009')
-
-alpha_peak <- as.Date("2020-11-19")
-delta_peak <- as.Date("2021-09-08")
 
 # breaks_plt <- seq(1,1001, 100)
 # labels_plt <- c("1>", seq(100,900, 100), '1,000+')
@@ -256,7 +282,7 @@ us_hex_infections <- ggplot() +
   #         color = "thistle3")+
   colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
                                                na.value = "transparent",
-                                               rev = F,
+                                               rev = T,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
                                                limits = c(1,7),
@@ -277,6 +303,7 @@ ggsave(filename = "img/extra_figures/fig2e.png",
        height = 9, 
        dpi = 100)
 
+## New England zooming
 new_england_grid_infections <- hexgrid_preomicron_cum |> 
   filter(STATEFP %in% c("09","23","25","33","44","50"))
 
@@ -297,7 +324,7 @@ new_england_hex_infections <- ggplot() +
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
                                                na.value = "transparent",
-                                               rev = F,
+                                               rev = T,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
                                                limits = c(1,7),
@@ -332,7 +359,7 @@ ct_hex_infections <-  ggplot() +
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
                                                na.value = "transparent",
-                                               rev = F,
+                                               rev = T,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
                                                limits = c(1,7),
@@ -370,7 +397,7 @@ ggsave(plot = hex_infections,
 
 ## Patchwork all together
 fig2 <- (hexpop_zoom / hex_infections)+
-  # plot_annotation(tag_levels = 'A')+
+  plot_annotation(tag_level = 'A')+
   plot_layout(widths = c(3,1))&
   theme(plot.tag = element_text(size = 18),
         axis.text = element_text(size = 4))
@@ -380,7 +407,7 @@ ggsave(plot = fig2,
        file = "img/fig2.pdf",
        width = 9,
        height = 16,
-       dpi = 100
+       dpi = 300
 )
 
 ## hexgrids

@@ -13,15 +13,14 @@ excludes = c(
   "43", "72", "74", "78", "79", "15", "11"
 )
 
-cbgpop <- sf::st_read("data-products/geo-hexes/cbg_population.shp")
-
-hexpop <- sf::st_read("data-products/geo-hexes/hexid-population.shp")
+## Hexes, Population
+hexpop <- sf::st_read("data-products/geo-hexes/meta_population/hexid-population_new.shp")
 
 ## 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp")
 
 ## Pre-Omicron
-hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv") |>
+hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
   select(-geometry) |>
@@ -33,32 +32,32 @@ hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_p
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-08")
 
-hexgrid_test <- hexgrid_preomicron |> 
-  filter(date %in% seq.Date(to = delta_peak_date, 
-                            from = delta_peak_date-63, length.out = 64))
-
-sf::st_write(obj = hexgrid_test,
-             dsn = "data-products/hexgrid-infections-delta.geojson",
-             delete_dsn = T)
+# hexgrid_test <- hexgrid_preomicron |> 
+#   filter(date %in% seq.Date(to = delta_peak_date, 
+#                             from = delta_peak_date-63, length.out = 64))
+# 
+# sf::st_write(obj = hexgrid_test,
+#              dsn = "data-products/hexgrid-infections-delta.geojson",
+#              delete_dsn = T)
 
 # ## Omicron-era
-hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
-  mutate(hexid = as.character(hexid),
-         date = as.Date(date)) |>
-  # select(-geometry) |>
-  # mutate(infectionsPC = (infections/population)*1e5) |>
-  filter(infectionsPC >= 1) |>
-  left_join(hexes, by = "hexid") |>
-  sf::st_as_sf()
+# hexgrid_omicronera <- vroom::vroom("data-products/geo-hexes/hexid-observations_omicronera.csv") |>
+#   mutate(hexid = as.character(hexid),
+#          date = as.Date(date)) |>
+#   # select(-geometry) |>
+#   # mutate(infectionsPC = (infections/population)*1e5) |>
+#   filter(infectionsPC >= 1) |>
+#   left_join(hexes, by = "hexid") |>
+#   sf::st_as_sf()
 
 ## Breakdowns of each peaks
-breaks_plt <- seq(0,2500, 250)
-labels_plt <- c(seq(0,2250, 250), '2,500+')
-limits_plt <- c(0,2500)
+breaks_plt <- seq(0,500, 100)
+labels_plt <- c(seq(0,400, 100), '500+')
+limits_plt <- c(0,500)
 color_option <- "magma"
 
 hexgrid_infections_test <- hexgrid_preomicron |> 
-  filter(date == delta_peak_date) |>
+  filter(date == delta_peak) |>
   sf::st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
@@ -69,63 +68,28 @@ plt_peak_delta <- ggplot()+
             filter(infectionsPC == 0),
           mapping = aes(),
           fill = "grey70")+
-  scale_fill_viridis_b(option = color_option,
-                       name = "Estimated Infections/100k/week",
-                       direction = -1,
-                       breaks = breaks_plt,
-                       labels = labels_plt,
-                       limits = limits_plt,
-                       )+
-  theme_minimal()+
-  theme(legend.title.position = "top",
-        legend.location = "plot",
-        legend.position = "bottom", 
-        legend.key.width = grid::unit(3, "cm"))+
-  labs(title = delta_peak_date,
-       subtitle = "Delta wave peak")
-plt_peak_delta
-
-ggsave(plot = plt_peak_delta,
-       filename = "img/extra_figures/plot_peak_delta.png",
-       width = 16, 
-       height = 9, 
-       dpi = 100)
-
-omicron_peak_date <- as.Date("2022-01-20")
-
-hexgrid_infections_test <- hexgrid_omicronera |> 
-  filter(date == omicron_peak_date) |>
-  sf::st_transform(crs = 26915)
-
-plt_peak_omicron <- ggplot()+
-  geom_sf(data = hexgrid_infections_test,
-          mapping = aes(fill = infectionsPC))+
-  geom_sf(data = hexgrid_infections_test |>
-            filter(date == omicron_peak_date) |>
-            filter(infectionsPC == 0),
-          mapping = aes(),
-          fill = "grey70")+
-  scale_fill_viridis_b(option = color_option,
-                       name = "Estimated Infections/100k/week",
-                       direction = -1,
-                       breaks = breaks_plt,
-                       labels = labels_plt,
-                       limits = limits_plt,
+  # scale_fill_viridis_b(option = color_option,
+  #                      name = "Estimated Infections/100k/week",
+  #                      direction = -1,
+  #                      breaks = breaks_plt,
+  #                      labels = labels_plt,
+  #                      limits = limits_plt,
+  #                      )+
+  khroma::scale_fill_smoothrainbow(
+    name = "Estimated Infections/100k/week",
+    reverse = F,
+    breaks = breaks_plt,
+    labels = labels_plt,
+    limits = limits_plt,
   )+
   theme_minimal()+
   theme(legend.title.position = "top",
         legend.location = "plot",
         legend.position = "bottom", 
         legend.key.width = grid::unit(3, "cm"))+
-  labs(title = omicron_peak_date,
-       subtitle = "Omicron wave peak")
-plt_peak_omicron
-
-ggsave(plot = plt_peak_omicron,
-       filename = "img/extra_figures/plot_peak_omicron.png",
-       width = 16, 
-       height = 9, 
-       dpi = 100)
+  labs(title = delta_peak,
+       subtitle = "Delta wave peak")
+plt_peak_delta
 
 ## function to plot hexes with infections
 plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
@@ -147,7 +111,14 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
                            breaks = breaks_plt,
                            labels = labels_plt,
                            limits = limits_plt,
-      )+
+                           )+
+      # khroma::scale_fill_turku(
+      #   name = "Estimated Infections/100k/week",
+      #   reverse = T,
+      #   breaks = breaks_plt,
+      #   labels = labels_plt,
+      #   limits = limits_plt,
+      # )+
       theme_minimal()+
       theme(legend.title.position = "top",
             legend.location = "plot",
@@ -178,7 +149,7 @@ hexes <- hexes |>
   st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
-frame_files <- lapply(weeks[seq(1,649, 7)], 
+frame_files <- lapply(na.omit(weeks[seq(1,649, 7)]), 
                       plt_fun, 
                       TRUE,
                       st_transform(hexgrid_preomicron, 
@@ -196,7 +167,7 @@ animation2 <- magick::image_animate(magick::image_read(frame_files),
 animation2
 
 # Specify the output file path
-output_file <- "img/weekly_hex_preomicron.gif"
+output_file <- "img/weekly_hex_preomicron_meta30m.mpeg"
 
 # Save the GIF animation
 magick::image_write(animation2, output_file)
