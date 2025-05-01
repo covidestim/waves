@@ -196,9 +196,9 @@ for (i in 1:length(weeks)) {
                               control.compute = compute_list,
                               control.predictor = predictor_list)})
     
-    # sd_values <- CAR_model$summary.fitted.values$sd
+    sd_values <- CAR_model$summary.fitted.values$sd
     ## Uncomment if you wanna skip the while loop
-    sd_values <- 11
+    # sd_values <- 11
     
     ## The last resort, brute force
     if(counter == 10 && median(sd_values) < 10){

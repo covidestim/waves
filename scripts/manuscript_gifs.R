@@ -62,12 +62,15 @@ hexgrid_infections_test <- hexgrid_preomicron |>
   sf::st_as_sf()
 
 plt_peak_delta <- ggplot()+
-  geom_sf(data = hexgrid_infections_test,
-          mapping = aes(fill = infectionsPC))+
-  geom_sf(data = hexgrid_infections_test |>
-            filter(infectionsPC == 0),
-          mapping = aes(),
-          fill = "grey70")+
+  geom_sf(data = hex_spacetime_sp |> 
+            left_join(hexes) |> 
+            st_as_sf() |> 
+            st_transform(crs=26915),
+          mapping = aes(fill = log10(infections+1)))+
+  # geom_sf(data = hexgrid_infections_test |>
+  #           filter(infectionsPC == 0),
+  #         mapping = aes(),
+  #         fill = "grey70")+
   # scale_fill_viridis_b(option = color_option,
   #                      name = "Estimated Infections/100k/week",
   #                      direction = -1,
@@ -75,12 +78,13 @@ plt_peak_delta <- ggplot()+
   #                      labels = labels_plt,
   #                      limits = limits_plt,
   #                      )+
-  khroma::scale_fill_smoothrainbow(
+  khroma::scale_fill_batlow(
     name = "Estimated Infections/100k/week",
     reverse = F,
-    breaks = breaks_plt,
-    labels = labels_plt,
-    limits = limits_plt,
+    breaks = seq(0,4,1),
+    labels = scales::label_math(),
+    limits = c(0,4),
+    na.value = "transparent"
   )+
   theme_minimal()+
   theme(legend.title.position = "top",
@@ -102,23 +106,22 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
       geom_sf(data = hexes,
               fill = "transparent")+
       geom_sf(data = infections,
-              aes(fill = infectionsPC),
-              alpha = 0.75,
-              size = 3)+
-      scale_fill_viridis_b(option = color_option,
-                           name = "Estimated Infections/100k/week",
-                           direction = -1,
-                           breaks = breaks_plt,
-                           labels = labels_plt,
-                           limits = limits_plt,
-                           )+
-      # khroma::scale_fill_turku(
-      #   name = "Estimated Infections/100k/week",
-      #   reverse = T,
-      #   breaks = breaks_plt,
-      #   labels = labels_plt,
-      #   limits = limits_plt,
-      # )+
+              aes(fill = log10(infections+1)))+
+      # scale_fill_viridis_b(option = color_option,
+      #                      name = "Estimated Infections/100k/week",
+      #                      direction = -1,
+      #                      breaks = breaks_plt,
+      #                      labels = labels_plt,
+      #                      limits = limits_plt,
+      #                      )+
+      khroma::scale_fill_batlow(
+        name = "Estimated Infections/100k/week",
+        reverse = T,
+        breaks = seq(0,4,1),
+        labels = scales::label_math(),
+        limits = c(0,4),
+        na.value = "transparent"
+      )+
       theme_minimal()+
       theme(legend.title.position = "top",
             legend.location = "plot",
@@ -149,7 +152,7 @@ hexes <- hexes |>
   st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
-frame_files <- lapply(na.omit(weeks[seq(1,649, 7)]), 
+frame_files <- lapply(na.omit(weeks[seq(1,243, 7)]), 
                       plt_fun, 
                       TRUE,
                       st_transform(hexgrid_preomicron, 
@@ -167,7 +170,7 @@ animation2 <- magick::image_animate(magick::image_read(frame_files),
 animation2
 
 # Specify the output file path
-output_file <- "img/weekly_hex_preomicron_meta30m.mpeg"
+output_file <- "img/weekly_hex_preomicron_meta30m_batlow.gif"
 
 # Save the GIF animation
 magick::image_write(animation2, output_file)
