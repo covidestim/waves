@@ -1302,7 +1302,7 @@ us_border <- us_states |>
   st_as_sf() |> 
   rename(geometry = x)
 
-# palette_name <- "Inferno"
+palette_name <- "Inferno"
 # 
 # fig4a_layered <- ggplot()+
 #   ## US States border

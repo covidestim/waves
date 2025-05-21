@@ -52,7 +52,7 @@ us_states <- tigris::states(cb = T, resolution = "500k") |>
 
 ## peak date
 alpha_peak <- as.Date("2020-11-19")
-delta_peak <- as.Date("2021-09-08")
+delta_peak <- as.Date("2021-09-04")
 
 ## Threshold for filtering given the distribution, any value of trend that it is above the 3rd Quarter of the trend distribution
 threshold_mean <- 165
@@ -77,9 +77,7 @@ contour_alpha <- CAR_lag_alpha|>
   summarise(geometry = st_union(geometry),
             infections_pc = sum(mean, na.rm = T),
             area = format(round(set_units(st_area(st_union(geometry)), 
-                                          km^2),0)))
-
-contour_alpha <- contour_alpha |> 
+                                          km^2),0)))|> 
   mutate(area_format = format(area, 
                               big.mark = ","),
          area_numeric = drop_units(round(set_units(st_area(st_union(geometry)), 
@@ -87,12 +85,15 @@ contour_alpha <- contour_alpha |>
   mutate(wave = "1st Wave")
 
 ## Speed calculation
-contour_alpha$speed <- units::set_units(c(0, 
-                                          -diff(contour_alpha$area_numeric)), km^2/day)
+contour_alpha$diffusion <- units::set_units(c(0, 
+                                              -diff(contour_alpha$area_numeric)), 'km^2/day')
 
-contour_alpha$speed_numeric <- drop_units(contour_alpha$speed)
+contour_alpha$diffusion_numeric <- drop_units(contour_alpha$diffusion)
 
-## Delta
+contour_alpha$speed_numeric <- sqrt(abs(contour_alpha$diffusion_numeric))
+contour_alpha$speed <- units::set_units(contour_alpha$speed_numeric, 'km/day')
+
+## delta
 CAR_lag_delta <- CAR_df_preomicron |> 
   mutate(hexid = as.character(hexid)) |> 
   left_join(hexes) |> 
@@ -104,148 +105,65 @@ CAR_lag_delta <- CAR_df_preomicron |>
   st_transform(crs = 26915)
 
 contour_delta <- CAR_lag_delta|> 
-  # filter(!is.na(contour_surface)) |> 
   mutate(days = as.numeric(case_when(mean >= threshold_mean ~ (delta_peak - date)))) |>
   filter(!is.na(days)) |> 
   group_by(days, date) |> 
   summarise(geometry = st_union(geometry),
             infections_pc = sum(mean, na.rm = T),
             area = format(round(set_units(st_area(st_union(geometry)), 
-                                          km^2),0)))
-
-contour_delta <- contour_delta |> 
+                                          km^2),0)))|> 
   mutate(area_format = format(area, 
                               big.mark = ","),
          area_numeric = drop_units(round(set_units(st_area(st_union(geometry)), 
-                                                   km^2),0)))|> 
-  filter(!is.na(days)) |> 
+                                                   km^2),0))) |> 
   mutate(wave = "2nd Wave")
 
 ## Speed calculation
-contour_delta$speed <- units::set_units(c(0, 
-                                          -diff(contour_delta$area_numeric)), km^2/day)
+contour_delta$diffusion <- units::set_units(c(0, 
+                                              -diff(contour_delta$area_numeric)), 'km^2/day')
 
-contour_delta$speed_numeric <- drop_units(contour_delta$speed)
+contour_delta$diffusion_numeric <- drop_units(contour_delta$diffusion)
 
+contour_delta$speed_numeric <- sqrt(abs(contour_delta$diffusion_numeric))
+contour_delta$speed <- units::set_units(contour_delta$speed_numeric, 'km/day')
 
-## Table Summarizing
-library(gtsummary)
+## Speed distribution
+fig3a <- ggplot()+
+  geom_col(data = rbind(contour_alpha, contour_delta),
+           aes(x = days, y = speed, fill = wave),
+           alpha = 0.65,
+           position = position_dodge())+
+  geom_vline(xintercept = c(63, 56, 49, 42, 35, 28, 21, 14, 7), 
+             lty = "dotted", 
+             color = "grey50")+
+  theme_minimal()+
+  labs(x = "Days before peak", 
+       y = "Linear Speed")+
+  scale_x_reverse(breaks = seq(7,63,7),
+                  labels = seq(7,63,7),
+                  limits = c(63,7))+
+  # scale_y_continuous(name = "Speed of expansion \n [sq. km/day]",
+  #                    labels = scales::label_comma(),
+  #                    breaks = scales::breaks_extended(n=10),
+  #                    # sec.axis = sec_axis(~./scaleFactor, name="Speed of centroid \n [km/day]", 
+  #                    #                     breaks = scales::breaks_extended(n=5),
+  #                    #                     labels = scales::label_comma())
+  #                    )+
+  units::scale_y_units(labels = scales::label_comma(),
+                       breaks = scales::breaks_extended(n=10))+
+  colorspace::scale_fill_discrete_divergingx()+
+  colorspace::scale_color_discrete_divergingx()+
+  theme(legend.position = "none",
+        legend.background = element_rect(),
+        legend.title = element_blank())+
+  facet_wrap(.~wave, ncol = 1,strip.position = "right")
+fig3a
 
-# ## Joined dataframe
-# joined_table <- rbind(contour_alpha |>
-#                         filter(days %in% seq(0,63, 21)) |> 
-#                         st_drop_geometry() |> 
-#                         select(date, -days, infections_pc, area_numeric, speed_numeric, wave),
-#                       contour_delta|>
-#                         filter(days %in% seq(0,63, 21)) |> 
-#                         st_drop_geometry() |> 
-#                         select(date, infections_pc, area_numeric, speed_numeric, wave)) |> 
-#   ungroup() |> 
-#   # select(-days) |> 
-#   group_by(date, wave)
-# 
-# tbl_wave1 <- joined_table |> 
-#   filter(wave == "1st Wave") |>
-#   ## Nasty trick to organize days from 63 days prior to peak day
-#   mutate(days = -days) |> 
-#   tbl_summary(by = days,
-#               include = c(infections_pc, area_numeric, speed_numeric),
-#               label = list(infections_pc ~ "Infections per capita \n (infections/100k)",
-#                            area_numeric ~ "Area \n (km^2)",
-#                            speed_numeric ~ "Speed \n (km^2/day)"),
-#               type = list(c(infections_pc, area_numeric, speed_numeric) ~ 'continuous'),
-#               statistic = list(c(infections_pc, area_numeric, speed_numeric) ~ "{mean}"),
-#               digits = all_continuous() ~ 0) |> 
-#   modify_header(label ~ "**Wave 1**",
-#                 update = list(stat_1 ~ "**2020-09-17**",
-#                               stat_2 ~ "**2020-10-08**",
-#                               stat_3 ~ "**2020-10-29**",
-#                               stat_4 ~ "**2020-11-19**")) |> 
-#   modify_spanning_header(all_stat_cols() ~ "**Date**") |> 
-#   modify_footnote(everything() ~ NA)
-# tbl_wave1
-# 
-# tbl_wave2 <- joined_table |> 
-#   filter(wave == "2nd Wave") |>
-#   ## Nasty trick to organize days from 63 days prior to peak day
-#   mutate(days = -days) |> 
-#   tbl_summary(by = days,
-#               include = c(infections_pc, area_numeric, speed_numeric),
-#               label = list(infections_pc ~ "Infections per capita \n (infections/100k)",
-#                            area_numeric ~ "Area \n (km^2)",
-#                            speed_numeric ~ "Speed \n (km^2/day)"),
-#               type = list(c(infections_pc, area_numeric, speed_numeric) ~ 'continuous'),
-#               statistic = list(c(infections_pc, area_numeric, speed_numeric) ~ "{mean}"),
-#               digits = all_continuous() ~ 0) |> 
-#   modify_header(label ~ "**Wave 2**",
-#                 update = list(stat_1 ~ "**2021-07-07**",
-#                               stat_2 ~ "**2021-07-28**",
-#                               stat_3 ~ "**2021-08-18**",
-#                               stat_4 ~ "**2021-09-08**")) |> 
-#   modify_spanning_header(all_stat_cols() ~ "**Date**") |> 
-#   modify_footnote(everything() ~ NA)
-# tbl_wave2
-# 
-# tbl_stack <- tbl_stack(list(tbl_wave1, tbl_wave2), 
-#                        quiet = T, 
-#                        group_header = c("Wave 1", "Wave 2"))
-# tbl_stack
-# 
-# library(gt)
-# joined_table |> 
-#   arrange(desc(days)) |> 
-#   gt(groupname_col = "wave",
-#      rowname_col = "date") |> 
-#   tab_header(
-#     title = md("**Table.1 - Waves Characteristics**")
-#   ) |> 
-#   fmt_number(
-#     columns = c(days, infections_pc, area_numeric, speed_numeric),
-#     decimals = 0
-#   ) |> 
-#   cols_label(
-#     days = md("Days prior to peak"),
-#     infections_pc = md("Infections per capita<br>[infections/100k]"),
-#     area_numeric = md("Area<br>[km<sup>2</sup>]"),
-#     speed_numeric = md("Speed<br>[km<sup>2</sup>/day]")
-#   ) |> 
-#   summary_rows(columns = -c(days,speed_numeric),
-#                fns = list(label = "Total", fn = "sum"),
-#                fmt = ~ fmt_number(.x, decimals = 0))
-  
-
-## Filtering 0 speed for centroid velocity calculation
-contour_alpha <- contour_alpha |> 
-  mutate(speed_numeric = if_else(speed_numeric == 0, NA, speed_numeric))
-
-contour_delta <- contour_delta |> 
-  mutate(speed_numeric = if_else(speed_numeric == 0, NA, speed_numeric))
-
-## Centroid movement and speed
-centroid_alpha <- contour_alpha |> 
-  group_by(days) |> 
-  summarise(path = units::set_units(st_area(st_union(geometry)), km^2))|> 
-  mutate(geometry = st_centroid(geometry)) |> 
-  mutate(lat = st_coordinates(geometry)[,"X"],
-         latend = lag(lat),
-         lon = st_coordinates(geometry)[,"Y"],
-         lonend = lag(lon)) |>
-  st_transform(crs = 26915) |> 
-  mutate(wave = "1st Wave")
-
-centroid_alpha$distance <- units::set_units(c(0, st_distance(centroid_alpha[-1,],
-                                                             centroid_alpha[-nrow(centroid_alpha),],
-                                                             by_element=TRUE)), km)
-
-centroid_alpha$centroid_speed <- units::set_units(c(0, 
-                                                    abs(-diff(round(centroid_alpha$distance, 
-                                                                    0)))), km/day)
-
-centroid_alpha$centroid_speed_numeric <- drop_units(centroid_alpha$centroid_speed)
-
-palette_name <- "Viridis"
-rev <- FALSE
-# breaks <- c(1e3,seq(5e4,7e5, 5e4))
+ggsave(filename = "img/extra_figures/fig3a_old.png",
+       plot = fig3a,
+       width = 16, 
+       height = 9, 
+       dpi = 300)
 
 # library(metR)
 # ggplot(contour_alpha, 
@@ -255,146 +173,103 @@ rev <- FALSE
 #   geom_text_contour(stroke = 0.2) +
 #   scale_fill_divergent() 
 
-breaks_alpha <- seq.Date(from = (alpha_peak-63),
-                   to = alpha_peak,
-                   by = "3 days")
-
-labels_alpha <- c(as.character(alpha_peak-63), rep(" ", 2),
-            as.character(alpha_peak-56), rep(" ", 2),
-            as.character(alpha_peak-45), rep(" ", 2),
-            as.character(alpha_peak-36), rep(" ", 2),
-            as.character(alpha_peak-27), rep(" ", 2),
-            as.character(alpha_peak-18), rep(" ", 2),
-            as.character(alpha_peak-9), rep(" ", 2),
-            "1st Wave peak: \n 2020-11-19")
-
-fig3a <- ggplot()+
+fig3b <- ggplot()+
   ## peak layers
-  geom_sf(data = contour_alpha |>
-            filter(!is.na(days),
-                   days %in% seq(0,63,3)),
-          aes(fill = date, color = date))+
-  # geom_sf(data = contour_alpha |>
-  #           filter(!is.na(days)),
-  #         aes(color = date),
-  #         fill = "transparent")+
-  # geom_segment(data = centroid_alpha,
-  #              inherit.aes = F,
-  #              arrow = arrow(length = unit(0.1, "cm")),
-  #              show.legend = T,
-  #              aes(x = lat, xend = latend,
-  #                  y = lon, yend = lonend),
-  #              color = "deeppink1")+
-colorspace::scale_fill_continuous_sequential(palette = palette_name,
-                                         rev = rev,
-                                         breaks = breaks_alpha,
-                                         labels = labels_alpha,
-                                         limits = c((alpha_peak-63), alpha_peak),
-                                         trans = "date")+
-  colorspace::scale_color_continuous_sequential(palette = palette_name,
-                                            rev = rev,
-                                            breaks = breaks_alpha,
-                                            labels = labels_alpha,
-                                            limits = c((alpha_peak-63), alpha_peak),
-                                            trans = "date")+
+  geom_sf(data = us_states,
+          fill = "transparent",
+          color = "black")+
+  geom_sf(data = contour_alpha,
+          aes(fill = speed_numeric),
+          alpha = 0.70)+
+  scico::scale_fill_scico(breaks = seq(0,1100, 50),
+                          palette = "lipari",
+                          # direction = -1,
+                          limits = c(0,1100),
+                          labels = scales::label_comma(),
+                          name = "Speed of expansion [km/day]")+
+  # khroma::scale_fill_batlow(breaks = seq(0,1100, 50),
+  #                           # reverse = T,
+  #                           limits = c(0,1100),
+  #                           labels = scales::label_comma(),
+  #                           name = "Linear Speed [km/day]")+
+  # khroma::scale_color_acton(breaks = seq(0,1100, 50),
+  #                           # reverse = T,
+  #                           limits = c(0,1100),
+  #                           labels = scales::label_comma(),
+  #                           name = "Linear Speed [km/day]")+
   theme_void()+
   theme(legend.position = "right",
-        legend.title = element_blank(), 
-        legend.text = element_text(),
+        legend.title = element_text(angle = 90, vjust = 0.5, hjust = 0.5), 
+        legend.title.position = "left",
+        # legend.text = element_text(),
         legend.direction = "vertical",
         legend.key.height = unit(0.5, "cm"))+
   guides(fill = guide_legend(reverse = F, ncol = 1),
          color = guide_legend(reverse = F, ncol = 1))+
   labs(title = "1st Wave")
-fig3a
+fig3b
 
-## Centroid movement and speed
-centroid_delta <- contour_delta |> 
-  group_by(days) |> 
-  summarise(path = units::set_units(st_area(st_union(geometry)), km^2))|> 
-  mutate(geometry = st_centroid(geometry)) |> 
-  mutate(lat = st_coordinates(geometry)[,"X"],
-         latend = lag(lat),
-         lon = st_coordinates(geometry)[,"Y"],
-         lonend = lag(lon)) |>
-  st_transform(crs = 26915) |> 
-  mutate(wave = "2nd Wave")
+ggsave(filename = "img/extra_figures/fig3b_old.png",
+       plot = fig3b,
+       width = 16, 
+       height = 9, 
+       dpi = 300)
 
-centroid_delta$distance <- units::set_units(c(0, st_distance(centroid_delta[-1,],
-                                                             centroid_delta[-nrow(centroid_delta),],
-                                                             by_element=TRUE)), km)
-
-centroid_delta$centroid_speed <- units::set_units(c(0, 
-                                                    abs(-diff(round(centroid_delta$distance, 
-                                                                    0)))), km/day)
-
-centroid_delta$centroid_speed_numeric <- drop_units(centroid_delta$centroid_speed)
-
-breaks_delta <- seq.Date(from = (delta_peak-63),
-                   to = delta_peak,
-                   by = "3 days")
-
-labels_delta <- c(as.character(delta_peak-63), rep(" ", 2),
-            as.character(delta_peak-56), rep(" ", 2),
-            as.character(delta_peak-45), rep(" ", 2),
-            as.character(delta_peak-36), rep(" ", 2),
-            as.character(delta_peak-27), rep(" ", 2),
-            as.character(delta_peak-18), rep(" ", 2),
-            as.character(delta_peak-9), rep(" ", 2),
-            "2nd Wave peak: \n 2021-09-08")
-
-fig3b <- ggplot()+
+fig3c <- ggplot()+
   ## peak layers
-  geom_sf(data = contour_delta |>
-            filter(!is.na(days),
-                   days %in% seq(0,63,3)),
-          aes(fill = date, color = date))+
-  # geom_sf(data = contour_alpha |>
-  #           filter(!is.na(days)),
-  #         aes(color = date),
-  #         fill = "transparent")+
-  # geom_segment(data = centroid_alpha,
-  #              inherit.aes = F,
-  #              arrow = arrow(length = unit(0.1, "cm")),
-  #              show.legend = T,
-  #              aes(x = lat, xend = latend,
-  #                  y = lon, yend = lonend),
-  #              color = "deeppink1")+
-colorspace::scale_fill_continuous_sequential(palette = palette_name,
-                                             rev = rev,
-                                             breaks = breaks_delta,
-                                             labels = labels_delta,
-                                             limits = c((delta_peak-63), delta_peak),
-                                             trans = "date")+
-  colorspace::scale_color_continuous_sequential(palette = palette_name,
-                                            rev = rev,
-                                            breaks = breaks_delta,
-                                            labels = labels_delta,
-                                            limits = c((delta_peak-63), delta_peak),
-                                            trans = "date")+
+  geom_sf(data = us_states,
+          fill = "transparent",
+          color = "black")+
+  geom_sf(data = contour_delta,
+          aes(fill = speed_numeric),
+          alpha = 0.70)+
+  scico::scale_fill_scico(breaks = seq(0,1100, 50),
+                          palette = "lipari",
+                          # direction = -1,
+                          limits = c(0,1100),
+                          labels = scales::label_comma(),
+                          name = "Speed of expansion [km/day]")+
+  # khroma::scale_fill_batlow(breaks = seq(0,1100, 50),
+  #                                  # reverse = T,
+  #                                  limits = c(0,1100),
+  #                                  labels = scales::label_comma(),
+  #                                  name = "Linear Speed [km/day]")+
+  # khroma::scale_color_acton(breaks = seq(0,1100, 50),
+  #                                   # reverse = T,
+  #                                   limits = c(0,1100),
+  #                                   labels = scales::label_comma(),
+  #                                   name = "Linear Speed [km/day]")+
   theme_void()+
   theme(legend.position = "right",
-        legend.title = element_blank(), 
-        legend.text = element_text(),
+        legend.title = element_text(angle = 90, vjust = 0.5, hjust = 0.5), 
+        legend.title.position = "left",
+        # legend.text = element_text(),
         legend.direction = "vertical",
         legend.key.height = unit(0.5, "cm"))+
   guides(fill = guide_legend(reverse = F, ncol = 1),
          color = guide_legend(reverse = F, ncol = 1))+
   labs(title = "2nd Wave")
-fig3b
+fig3c
+
+ggsave(filename = "img/extra_figures/fig3c_old.png",
+       plot = fig3c,
+       width = 16, 
+       height = 9, 
+       dpi = 300)
 
 library(patchwork)
 
-figS5 <- (fig3a / fig3b)
-figS5
+fig4 <- (fig3b / fig3c)+
+  plot_layout(guides = "collect")
+fig4
 
-ggsave(filename = "img/extra_figures/figS5.png",
+ggsave(filename = "img/extra_figures/fig4_old.png",
        plot = figS5,
        width = 9, 
        height = 16,
        dpi = 200)
 
-ggsave(filename = "img/extra_figures/figS5.pdf",
+ggsave(filename = "img/extra_figures/fig4_old.pdf",
        plot = figS5,
        width = 9, 
        height = 16,
@@ -482,38 +357,6 @@ ggsave(filename = "img/extra_figures/figS5.pdf",
 ## Scaling factor for the secondary axis
 # scaleFactor <- max(rbind(contour_alpha, contour_delta)$speed_numeric, na.rm = T) / max(rbind(centroid_alpha, centroid_delta)$centroid_speed_numeric, na.rm = T)
 
-## Speed distribution
-fig3c <- ggplot()+
-  geom_col(data = rbind(contour_alpha, contour_delta),
-           aes(x = days, y = speed, fill = wave),
-           alpha = 0.65,
-           position = position_dodge())+
-  geom_vline(xintercept = c(63, 56, 49, 42, 35, 28, 21, 14, 7), 
-             lty = "dotted", 
-             color = "grey50")+
-  theme_minimal()+
-  labs(x = "Days before peak", 
-       y = "Speed of expansion")+
-  scale_x_reverse(breaks = seq(7,63,7),
-                  labels = seq(7,63,7),
-                  limits = c(63,7))+
-  # scale_y_continuous(name = "Speed of expansion \n [sq. km/day]",
-  #                    labels = scales::label_comma(),
-  #                    breaks = scales::breaks_extended(n=10),
-  #                    # sec.axis = sec_axis(~./scaleFactor, name="Speed of centroid \n [km/day]", 
-  #                    #                     breaks = scales::breaks_extended(n=5),
-  #                    #                     labels = scales::label_comma())
-  #                    )+
-  units::scale_y_units(labels = scales::label_comma(),
-                       breaks = scales::breaks_extended(n=10))+
-  colorspace::scale_fill_discrete_divergingx()+
-  colorspace::scale_color_discrete_divergingx()+
-  theme(legend.position = "none",
-        legend.background = element_rect(),
-        legend.title = element_blank())+
-  facet_wrap(.~wave, ncol = 1,strip.position = "right")
-fig3c
-
 library(patchwork)
 
 ## Final Layered figure
@@ -532,8 +375,163 @@ ggsave(filename = "img/extra_figures/fig4_layered.pdf",
        height = 9, 
        dpi = 300)
 
-## Creating the US border for the lower 48 states
-us_border <- us_states |> 
-  st_union() |> 
-  st_as_sf() |> 
-  rename(geometry = x)
+# ## Creating the US border for the lower 48 states
+# us_border <- us_states |> 
+#   st_union() |> 
+#   st_as_sf() |> 
+#   rename(geometry = x)
+
+# ## Table Summarizing
+# library(gtsummary)
+
+# ## Joined dataframe
+# joined_table <- rbind(contour_alpha |>
+#                         filter(days %in% seq(0,63, 21)) |> 
+#                         st_drop_geometry() |> 
+#                         select(date, -days, infections_pc, area_numeric, speed_numeric, wave),
+#                       contour_delta|>
+#                         filter(days %in% seq(0,63, 21)) |> 
+#                         st_drop_geometry() |> 
+#                         select(date, infections_pc, area_numeric, speed_numeric, wave)) |> 
+#   ungroup() |> 
+#   # select(-days) |> 
+#   group_by(date, wave)
+# 
+# tbl_wave1 <- joined_table |> 
+#   filter(wave == "1st Wave") |>
+#   ## Nasty trick to organize days from 63 days prior to peak day
+#   mutate(days = -days) |> 
+#   tbl_summary(by = days,
+#               include = c(infections_pc, area_numeric, speed_numeric),
+#               label = list(infections_pc ~ "Infections per capita \n (infections/100k)",
+#                            area_numeric ~ "Area \n (km^2)",
+#                            speed_numeric ~ "Speed \n (km^2/day)"),
+#               type = list(c(infections_pc, area_numeric, speed_numeric) ~ 'continuous'),
+#               statistic = list(c(infections_pc, area_numeric, speed_numeric) ~ "{mean}"),
+#               digits = all_continuous() ~ 0) |> 
+#   modify_header(label ~ "**Wave 1**",
+#                 update = list(stat_1 ~ "**2020-09-17**",
+#                               stat_2 ~ "**2020-10-08**",
+#                               stat_3 ~ "**2020-10-29**",
+#                               stat_4 ~ "**2020-11-19**")) |> 
+#   modify_spanning_header(all_stat_cols() ~ "**Date**") |> 
+#   modify_footnote(everything() ~ NA)
+# tbl_wave1
+# 
+# tbl_wave2 <- joined_table |> 
+#   filter(wave == "2nd Wave") |>
+#   ## Nasty trick to organize days from 63 days prior to peak day
+#   mutate(days = -days) |> 
+#   tbl_summary(by = days,
+#               include = c(infections_pc, area_numeric, speed_numeric),
+#               label = list(infections_pc ~ "Infections per capita \n (infections/100k)",
+#                            area_numeric ~ "Area \n (km^2)",
+#                            speed_numeric ~ "Speed \n (km^2/day)"),
+#               type = list(c(infections_pc, area_numeric, speed_numeric) ~ 'continuous'),
+#               statistic = list(c(infections_pc, area_numeric, speed_numeric) ~ "{mean}"),
+#               digits = all_continuous() ~ 0) |> 
+#   modify_header(label ~ "**Wave 2**",
+#                 update = list(stat_1 ~ "**2021-07-07**",
+#                               stat_2 ~ "**2021-07-28**",
+#                               stat_3 ~ "**2021-08-18**",
+#                               stat_4 ~ "**2021-09-08**")) |> 
+#   modify_spanning_header(all_stat_cols() ~ "**Date**") |> 
+#   modify_footnote(everything() ~ NA)
+# tbl_wave2
+# 
+# tbl_stack <- tbl_stack(list(tbl_wave1, tbl_wave2), 
+#                        quiet = T, 
+#                        group_header = c("Wave 1", "Wave 2"))
+# tbl_stack
+# 
+# library(gt)
+# joined_table |> 
+#   arrange(desc(days)) |> 
+#   gt(groupname_col = "wave",
+#      rowname_col = "date") |> 
+#   tab_header(
+#     title = md("**Table.1 - Waves Characteristics**")
+#   ) |> 
+#   fmt_number(
+#     columns = c(days, infections_pc, area_numeric, speed_numeric),
+#     decimals = 0
+#   ) |> 
+#   cols_label(
+#     days = md("Days prior to peak"),
+#     infections_pc = md("Infections per capita<br>[infections/100k]"),
+#     area_numeric = md("Area<br>[km<sup>2</sup>]"),
+#     speed_numeric = md("Speed<br>[km<sup>2</sup>/day]")
+#   ) |> 
+#   summary_rows(columns = -c(days,speed_numeric),
+#                fns = list(label = "Total", fn = "sum"),
+#                fmt = ~ fmt_number(.x, decimals = 0))
+
+## Centroid movement and speed
+centroid_alpha <- contour_alpha |> 
+  group_by(days) |> 
+  summarise(path = units::set_units(st_area(st_union(geometry)), km^2))|> 
+  mutate(geometry = st_centroid(geometry)) |> 
+  mutate(lat = st_coordinates(geometry)[,"X"],
+         latend = lag(lat),
+         lon = st_coordinates(geometry)[,"Y"],
+         lonend = lag(lon)) |>
+  st_transform(crs = 26915) |> 
+  mutate(wave = "1st Wave")
+
+centroid_alpha$distance <- units::set_units(c(0, st_distance(centroid_alpha[-1,],
+                                                             centroid_alpha[-nrow(centroid_alpha),],
+                                                             by_element=TRUE)), km)
+
+centroid_alpha$centroid_speed <- units::set_units(c(0, 
+                                                    abs(-diff(round(centroid_alpha$distance, 
+                                                                    0)))), km/day)
+
+centroid_alpha$centroid_speed_numeric <- drop_units(centroid_alpha$centroid_speed)
+
+## Centroid movement and speed
+centroid_delta <- contour_delta |> 
+  group_by(days) |> 
+  summarise(path = units::set_units(st_area(st_union(geometry)), km^2))|> 
+  mutate(geometry = st_centroid(geometry)) |> 
+  mutate(lat = st_coordinates(geometry)[,"X"],
+         latend = lag(lat),
+         lon = st_coordinates(geometry)[,"Y"],
+         lonend = lag(lon)) |>
+  st_transform(crs = 26915) |> 
+  mutate(wave = "2nd Wave")
+
+centroid_delta$distance <- units::set_units(c(0, st_distance(centroid_delta[-1,],
+                                                             centroid_delta[-nrow(centroid_delta),],
+                                                             by_element=TRUE)), km)
+
+centroid_delta$centroid_speed <- units::set_units(c(0, 
+                                                    abs(-diff(round(centroid_delta$distance, 
+                                                                    0)))), km/day)
+
+centroid_delta$centroid_speed_numeric <- drop_units(centroid_delta$centroid_speed)
+
+breaks_alpha <- seq.Date(from = (alpha_peak-63),
+                         to = alpha_peak,
+                         by = "3 days")
+
+labels_alpha <- c(as.character(alpha_peak-63), rep(" ", 2),
+                  as.character(alpha_peak-56), rep(" ", 2),
+                  as.character(alpha_peak-45), rep(" ", 2),
+                  as.character(alpha_peak-36), rep(" ", 2),
+                  as.character(alpha_peak-27), rep(" ", 2),
+                  as.character(alpha_peak-18), rep(" ", 2),
+                  as.character(alpha_peak-9), rep(" ", 2),
+                  "1st Wave peak: \n 2020-11-19")
+
+breaks_delta <- seq.Date(from = (delta_peak-63),
+                         to = delta_peak,
+                         by = "3 days")
+
+labels_delta <- c(as.character(delta_peak-63), rep(" ", 2),
+                  as.character(delta_peak-56), rep(" ", 2),
+                  as.character(delta_peak-45), rep(" ", 2),
+                  as.character(delta_peak-36), rep(" ", 2),
+                  as.character(delta_peak-27), rep(" ", 2),
+                  as.character(delta_peak-18), rep(" ", 2),
+                  as.character(delta_peak-9), rep(" ", 2),
+                  "2nd Wave peak: \n 2021-09-08")

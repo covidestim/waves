@@ -19,13 +19,16 @@ excludes = c(
   "43", "72", "74", "78", "79", "15", "11"
 )
 
-hexpop <- sf::st_read("data-products/geo-hexes/meta_population/hexid-population_new.shp")|> 
-  st_transform(crs = 26915)
+## New hexgrid with Meta 30m population
+hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
+  filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
+  st_transform(crs = 26915) |>
+  rename(population = metapop_30m)
 
 us_states <- tigris::states(cb = T) |> 
   dplyr::filter(!STATEFP %in% excludes) |> 
   tigris::shift_geometry()|> 
-    st_transform(crs = 26915)
+  st_transform(crs = 26915)
 
 # ## Highways
 # highways <- tigris::primary_roads(year = 2024) |> 
@@ -48,12 +51,13 @@ ct_counties <- tigris::counties(state = 09)|>
 palette <- "Purple-Yellow"
 
 us_hex_plt <- ggplot() + 
-  geom_sf(data = hexes|>
-            filter(as.integer(hexid) < 7662) |>
-            st_transform(crs = 'ESRI:102009'),
-          fill = 'transparent')+
+  # geom_sf(data = hexes|>
+  #           filter(as.integer(hexid) < 7662) |>
+  #           st_transform(crs = 'ESRI:102009'),
+  #         fill = 'transparent')+
   geom_sf(hexpop |> 
-            filter(!is.na(population)), 
+            filter(!is.na(population)) |>
+            st_transform(crs = 'ESRI:102009'),
           mapping=aes(fill = log10(population+1))) +
   geom_sf(us_states,
           mapping=aes(),
@@ -63,27 +67,21 @@ us_hex_plt <- ggplot() +
                                                palette = palette,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               limits = c(1,7))+
-  colorspace::scale_color_continuous_sequential(name = "Population\n(log scale)",
-                                                palette = palette,
-                                                breaks = seq(1,7,1),
-                                                # labels = scales::label_math(),
-                                                limits = c(1,7))+
-  # khroma::scale_color_smoothraibow(name = "Population\n(log scale)",
-  #                            reverse = T,
-  #                            breaks = seq(1,7,1),
-  #                            limits = c(1,7))+
+                                               limits = c(1,7),
+                                               na.value = "grey60"
+  )+
+  # scale_colour_manual(values=NA) +              
+  # guides(colour=guide_legend("No data", override.aes=list(colour="grey60")))+
   theme_minimal()+
-  guides(color = "none")+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
-        legend.key.width = grid::unit(3, "cm"),
+        legend.key.width = grid::unit(1, "in"),
         axis.text = element_text(size = 6))
 us_hex_plt
 
 ggsave(plot = us_hex_plt,
-       filename = "img/extra_figures/fig2a.png",
+       filename = "img/extra_figures/fig1a_new.png",
        width = 16,
        height = 9,
        dpi = 100)
@@ -103,7 +101,8 @@ new_england_states <- us_states|>
 
 new_england_hex_plt <- ggplot()+
   geom_sf(new_england_hexpop |> 
-            filter(!is.na(population)),
+            filter(!is.na(population)) |>
+            st_transform(crs = 'ESRI:102009'),
           mapping=aes(fill= log10(population+1)))+ 
   geom_sf(new_england_states,
           mapping=aes(),
@@ -113,28 +112,21 @@ new_england_hex_plt <- ggplot()+
                                                palette = palette,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               limits = c(1,7))+
-  colorspace::scale_color_continuous_sequential(name = "Population\n(log scale)",
-                                                palette = palette,
-                                                breaks = seq(1,7,1),
-                                                # labels = scales::label_math(),
-                                                limits = c(1,7))+
-  # khroma::scale_fill_smoothrainbow(name = "Population\n(log scale)",
-  #                            reverse = F,
-  #                            breaks = seq(1,7,1),
-  #                            labels = scales::label_math(),
-  #                            limits = c(1,7))+
+                                               limits = c(1,7),
+                                               na.value = "grey60"
+  )+
+  # scale_colour_manual(values=NA) +              
+  # guides(colour=guide_legend("No data", override.aes=list(colour="grey60")))+
   theme_minimal()+
-  guides(color = "none")+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
-        legend.key.width = grid::unit(3, "cm"),
+        legend.key.width = grid::unit(1, "in"),
         axis.text = element_text(size = 6))
 new_england_hex_plt
 
 ggsave(plot = new_england_hex_plt,
-       filename = "img/extra_figures/fig2b.png",
+       filename = "img/extra_figures/fig1b_new.png",
        width = 16, 
        height = 9, 
        dpi = 100)
@@ -142,12 +134,10 @@ ggsave(plot = new_england_hex_plt,
 ct_hexpop <- hexpop |> 
   filter(STATEFP %in% c("09"))
 
-ct_counties <- us_counties |> 
-  filter(STATEFP %in% c("09"))
-
 ct_hex_plt <- ggplot()+
   geom_sf(ct_hexpop |> 
-            filter(!is.na(population)),
+            filter(!is.na(population)) |>
+            st_transform(crs = 'ESRI:102009'),
           mapping=aes(fill = log10(population+1)))+ 
   geom_sf(ct_counties,
           mapping=aes(),
@@ -157,27 +147,20 @@ ct_hex_plt <- ggplot()+
                                                palette = palette,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
-                                               limits = c(1,7))+
-  colorspace::scale_color_continuous_sequential(name = "Population\n(log scale)",
-                                                palette = palette,
-                                                breaks = seq(1,7,1),
-                                                # labels = scales::label_math(),
-                                                limits = c(1,7))+
-  # khroma::scale_fill_smoothrainbow(name = "Population\n(log scale)",
-  #                                  reverse = F,
-  #                                  breaks = seq(1,7,1),
-  #                                  labels = scales::label_math(),
-  #                                  limits = c(1,7))+
+                                               limits = c(1,7),
+                                               na.value = "grey60"
+  )+
+  # scale_colour_manual(values=NA) +              
+  # guides(colour=guide_legend("No data", override.aes=list(colour="grey60")))+
   theme_minimal()+
-  guides(color = "none")+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
-        legend.key.width = grid::unit(3, "cm"),
+        legend.key.width = grid::unit(1, "in"),
         axis.text = element_text(size = 6))
 ct_hex_plt
 
-ggsave(filename = "img/extra_figures/fig2c.png",
+ggsave(filename = "img/extra_figures/fig1c_new.png",
        plot = ct_hex_plt,
        width = 16,
        height = 9, 
@@ -187,27 +170,36 @@ library(patchwork)
 
 ## Patchwork Population
 hexpop_zoom <- (us_hex_plt | (new_england_hex_plt / ct_hex_plt))+
+  plot_annotation(tag_levels = 'A')+
   plot_layout(widths = c(4,1,1),
-              heights = c(4,1,1))+
-  plot_layout(guides = 'collect')&
+              heights = c(4,1,1), 
+              guides = "collect")&
   theme(legend.position = "bottom", 
         axis.text = element_text(size = 6))
 hexpop_zoom
 
 ggsave(plot = hexpop_zoom, 
-       filename = "img/extra_figures/fig2b.png",
+       filename = "img/extra_figures/fig1_upper_new.png",
        width = 16,
        height = 9,
        dpi = 100)
 
 ggsave(plot = hexpop_zoom, 
-       filename = "img/extra_figures/fig2b.pdf",
+       filename = "img/extra_figures/fig1_upper_new.pdf",
        width = 16,
        height = 9,
        dpi = 100)
 
 ## 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp")
+
+hexes <- hexes |>
+  filter(as.integer(hexid) < 7662) |>
+  left_join(hexes_to_county |>
+              select(hexid, fips) |>
+              mutate(hexid = as.character(hexid))) |>
+  mutate(STATEFP = str_sub(fips, 1, 2)) |>
+  st_transform(crs = 'ESRI:102009')
 
 ## Pre-Omicron
 hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
@@ -219,41 +211,25 @@ hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_p
   left_join(hexes, by = "hexid") |>
   sf::st_as_sf()
 
-hexes_to_county <- vroom::vroom("data-products/geo-hexes/hexid-fips-map.csv")
+## New hexgrid with Meta 30m population, loading again hexpop to have the original 7660 hexes
+hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
+  filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
+  st_transform(crs = 26915) |>
+  rename(population = metapop_30m)
 
 hexgrid_preomicron_cum <- hexgrid_preomicron |>
+  st_drop_geometry() |> 
   mutate(hexid = as.character(hexid)) |>
   group_by(hexid) |> 
-  summarise(cum_infections = sum(infections, na.rm = T)) |> 
+  summarise(cum_infections = sum(infections)) |> 
   left_join(hexpop|> 
               st_drop_geometry() |>
-              mutate(hexid = as.character(hexid))) |> 
+              mutate(hexid = as.character(hexid)) |> 
+              select(hexid, population)) |> 
   mutate(cum_infectionsPC = (cum_infections/population)*1e5) |>
-  filter(cum_infectionsPC >= 1)|>
+  # filter(cum_infectionsPC >= 1)|>
+  right_join(hexes) |> 
   sf::st_as_sf() |> 
-  st_transform(crs = 'ESRI:102009')
-
-## Peak dates
-alpha_peak <- as.Date("2020-11-19")
-delta_peak <- as.Date("2021-09-08")
-
-## Hexes joining with the county information
-hexgrid_infections <- hexgrid_preomicron |> 
-  st_drop_geometry() |> 
-  mutate(hexid = as.character(hexid)) |> 
-  filter(date == alpha_peak) |> ## Alpha peak
-  left_join(hexes_to_county |> select(hexid, fips) |> mutate(hexid = as.character(hexid))) |> 
-  mutate(STATEFP = str_sub(fips, 1, 2)) |> 
-  left_join(hexes) |> 
-  st_as_sf() |> 
-  st_transform(crs = 'ESRI:102009')
-
-hexes <- hexes |>
-  filter(as.integer(hexid) < 7662) |>
-  left_join(hexes_to_county |>
-              select(hexid, fips) |>
-              mutate(hexid = as.character(hexid))) |>
-  mutate(STATEFP = str_sub(fips, 1, 2)) |>
   st_transform(crs = 'ESRI:102009')
 
 # breaks_plt <- seq(1,1001, 100)
@@ -263,38 +239,27 @@ color_option <- "Inferno"
 
 ### Pre-Omicron
 us_hex_infections <- ggplot() + 
-  geom_sf(data = hexes|>
-            filter(as.integer(hexid) < 7662) |>
-            st_transform(crs = 'ESRI:102009'),
-          fill = 'transparent',
-          aes(color = ""))+
   geom_sf(hexgrid_preomicron_cum |> 
-            filter(!is.na(cum_infections))|> 
+            # filter(!is.na(cum_infections))|> 
             st_transform(crs = 'ESRI:102009'), 
-          mapping=aes(fill = log10(cum_infections+1),
-                      color = "")) +
+          mapping=aes(fill = log10(cum_infections+1))) +
   geom_sf(us_states,
           mapping=aes(),
           color = "black",
           fill = "transparent")+
-  # geom_sf(highways,
-  #         mapping = aes(),
-  #         color = "thistle3")+
   colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
-                                               na.value = "transparent",
+                                               na.value = "grey60",
                                                rev = T,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
                                                limits = c(1,7),
                                                palette = color_option)+
-  scale_color_manual(values = NA)+
   theme_minimal()+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
         legend.key.width = grid::unit(3, "cm"),
-        axis.text = element_text(size = 6))+
-  guides(colour="none")
+        axis.text = element_text(size = 6))
 us_hex_infections
 
 ggsave(filename = "img/extra_figures/fig2e.png", 
@@ -311,32 +276,25 @@ new_england_hexes <- hexes |>
   filter(STATEFP %in% c("09","23","25","33","44","50"))
 
 new_england_hex_infections <- ggplot() + 
-  geom_sf(data = new_england_hexes,
-          fill = 'transparent',
-          aes(color = ""))+
-  geom_sf(new_england_grid_infections |> 
-            filter(!is.na(cum_infections)), 
-          mapping=aes(fill = log10(cum_infections+1), 
-                      color = "")) +
+  geom_sf(new_england_grid_infections, 
+          mapping=aes(fill = log10(cum_infections+1))) +
   geom_sf(new_england_states,
           mapping=aes(),
           color = "black",
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
-                                               na.value = "transparent",
+                                               na.value = "grey60",
                                                rev = T,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
                                                limits = c(1,7),
                                                palette = color_option)+
-  scale_color_manual(values = NA)+
   theme_minimal()+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
         legend.key.width = grid::unit(3, "cm"),
-        axis.text = element_text(size = 6))+
-  guides(colour="none")
+        axis.text = element_text(size = 6))
 new_england_hex_infections
 
 ct_grid_infection <- hexgrid_preomicron_cum |> 
@@ -346,72 +304,67 @@ ct_hexes <- hexes |>
   filter(STATEFP == "09")
 
 ct_hex_infections <-  ggplot() + 
-  geom_sf(data = ct_hexes,
-          fill = "transparent",
-          aes(color = ""))+
   geom_sf(data = ct_grid_infection |> 
             filter(!is.na(cum_infections)), 
-          mapping=aes(fill = log10(cum_infections+1), 
-                      color = "")) +
+          mapping=aes(fill = log10(cum_infections+1))) +
   geom_sf(data = ct_counties,
           mapping=aes(),
           color = "black",
           fill = "transparent")+
   colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
-                                               na.value = "transparent",
+                                               na.value = "grey60",
                                                rev = T,
                                                breaks = seq(1,7,1),
                                                labels = scales::label_math(),
                                                limits = c(1,7),
                                                palette = color_option)+
-  scale_color_manual(values = NA)+
   theme_minimal()+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
         legend.key.width = grid::unit(3, "cm"),
-        axis.text = element_text(size = 6))+
-  guides(colour="none")
+        axis.text = element_text(size = 6))
 ct_hex_infections
 
 library(patchwork)
 hex_infections <- (us_hex_infections | (new_england_hex_infections / ct_hex_infections))+
+  plot_annotation(tag_levels = 'A')+
   plot_layout(widths = c(4,1,1),
-              heights = c(4,1,1))+
-  plot_layout(guides = 'collect')&
+              heights = c(4,1,1),
+              guides = 'collect')&
   theme(legend.position = "bottom", 
         axis.text = element_text(size = 6))
 hex_infections
 
 ggsave(plot = hex_infections,
-       filename = "img/extra_figures/fig2c.pdf",
+       filename = "img/extra_figures/fig1_lower_new.pdf",
        width = 16,
        height = 9,
        dpi = 100)
 
 ggsave(plot = hex_infections,
-       filename = "img/extra_figures/fig2c.png",
+       filename = "img/extra_figures/fig1_lower_new.png",
        width = 16,
        height = 9,
        dpi = 100)
 
 ## Patchwork all together
-fig2 <- (hexpop_zoom / hex_infections)+
+fig1 <- (hexpop_zoom / hex_infections)+
   plot_annotation(tag_level = 'A')+
   plot_layout(widths = c(3,1))&
   theme(plot.tag = element_text(size = 18),
         axis.text = element_text(size = 4))
-fig2
+fig1
 
-ggsave(plot = fig2,
-       file = "img/fig2.pdf",
+ggsave(plot = fig1,
+       file = "img/fig1_new.pdf",
        width = 9,
        height = 16,
        dpi = 300
 )
 
 ## hexgrids
-dataset <- "preomicron"
+dataset <- "meta30m_run_preomicron_daily"
 
 ## Pre-Omicron
 CAR_df_preomicron <- vroom::vroom(paste0("data-products/tsa_",
@@ -424,383 +377,125 @@ CAR_df_preomicron <- CAR_df_preomicron |>
   left_join(hexes) |> 
   select(hexid, date, population, infections, infectionsPC, mean, sd, geometry) |>
   st_as_sf() |> 
-  st_transform(crs = 26915)
+  st_transform(crs = 'ESRI:102009')
 
-# ## Breakdowns of each peaks
-# breaks_plt <- seq(0,1500, 150)
-# labels_plt <- c(seq(0,900, 150), "1,050", "1,200", "1,350",'1,500+')
-# limits_plt <- c(0,1700)
-# color_option <- "magma"
-# na_color <- "grey70"
-# 
-# ## Alpha wave snapshots
-# fig2.c <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (alpha_peak - 63)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   labs(title = (alpha_peak-63))
-# fig2.c
-# 
-# ggsave(plot = fig2.c,
-#        filename = "img/extra_figures/fig2c.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# fig2.d <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (alpha_peak - 42)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (alpha_peak-42))
-# fig2.d
-# 
-# ggsave(plot = fig2.d,
-#        filename = "img/extra_figures/fig2d.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# fig2.e <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (alpha_peak - 21)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (alpha_peak-21))
-# fig2.e
-# 
-# ggsave(plot = fig2.e,
-#        filename = "img/extra_figures/fig2e.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# fig2.f <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (alpha_peak)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (alpha_peak))
-# fig2.f
-# 
-# ggsave(plot = fig2.f,
-#        filename = "img/extra_figures/fig2f.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# ## Delta wave snapshots
-# fig2.g <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (delta_peak - 63)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (delta_peak-63))
-# fig2.g
-# 
-# ggsave(plot = fig2.g,
-#        filename = "img/extra_figures/fig2g.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# fig2.h <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (delta_peak - 42)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (delta_peak-42))
-# fig2.h
-# 
-# ggsave(plot = fig2.h,
-#        filename = "img/extra_figures/fig2h.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# fig2.i <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (delta_peak - 21)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC,
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (delta_peak-21))
-# fig2.i
-# 
-# ggsave(plot = fig2.i,
-#        filename = "img/extra_figures/fig2i.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# fig2.j <- ggplot(data = CAR_df_preomicron |> 
-#                    filter(date == (delta_peak)) |> 
-#                    st_transform(crs=26915),
-#                  aes(fill = infectionsPC, 
-#                      color = infectionsPC))+
-#   geom_sf()+
-#   geom_sf(data = us_states,
-#           color = "deeppink4",
-#           fill = "transparent")+
-#   scale_fill_viridis_b(option = color_option,
-#                        # name = "Estimated Infections/1000/week",
-#                        direction = -1,
-#                        na.value = na_color,
-#                        breaks = breaks_plt,
-#                        labels = labels_plt,
-#                        limits = limits_plt,
-#   )+
-#   scale_color_viridis_b(option = color_option,
-#                         # name = "Estimated Infections/1000/week",
-#                         direction = -1,
-#                         na.value = na_color,
-#                         breaks = breaks_plt,
-#                         labels = labels_plt,
-#                         limits = limits_plt,
-#   )+
-#   theme_void()+
-#   guides(fill = guide_bins(title = "Estimated infections per capita/100k/day",
-#                            title.position = "top",
-#                            title.hjust = 0.5),
-#          color = "none")+
-#   theme(legend.position = "bottom",
-#         legend.title.position = "top",
-#         legend.key.width = grid::unit(1, "cm"))+
-#   labs(title = (delta_peak))
-# fig2.j
-# 
-# ggsave(plot = fig2.j,
-#        filename = "img/extra_figures/fig2j.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 100)
-# 
-# ## Fig.2 patchwork
-# library(patchwork)
-# 
-# fig2 <- ((fig2.c / fig2.d / fig2.e / fig2.f) | (fig2.a.flip) | (fig2.g / fig2.h / fig2.i / fig2.j))+
-#   plot_layout(guides = "collect")&
-#   theme(legend.position = "bottom")
-# fig2
-# 
-# ggsave(plot = fig2,
-#        filename = "img/extra_figures/fig2_vertical.pdf",
-#        width = 16,
-#        height = 9, 
-#        dpi = 300)
+## Fig.2 Spatial hexes, population and infections
 
-## Figure 3, TSA
+fig2a_data <- CAR_df_preomicron |> 
+  st_drop_geometry() |> 
+  mutate(date = as.Date(date)) |> 
+  reframe(infections = sum(infections, na.rm = T),
+          infectionsPC = sum(infectionsPC, na.rm = T),
+          .by = "date") |> 
+  arrange(desc(date))
+
+# # Function that finds the closest date in a vector of dates.
+# find_closest_date <- function(date, date_vector)
+# {
+#   date_vector <- unique(date_vector)
+#   diffs <- abs(date - date_vector)
+#   
+#   # Two dates in date_vector can have the same distance to date, by adding
+#   # `[1]` we pick whichever comes first in date_vector.
+#   date_vector[diffs == min(diffs)][1]
+# }
+
+alpha_peak <- as.Date("2020-11-19")
+delta_peak <- as.Date("2021-09-04")
+
+alpha_peak_week <- as.Date("2020-11-28")
+delta_peak_week <- as.Date("2021-09-04")
+
+fig2a <- ggplot()+
+  geom_line(data = fig2a_data,
+            aes(x = date, 
+                y = infectionsPC))+
+  theme_minimal()+
+  scale_x_date(name = "Date",
+               date_breaks = "4 months",
+               date_labels = "%b %y'",
+               limits = c(as.Date("2020-02-01"), 
+                          as.Date("2021-11-01")))+
+  scale_y_continuous(name = "Estimated infection/day",
+                     labels = scales::label_comma())+
+  ## Alpha wave marks
+  annotate("rect",
+           xmin = alpha_peak - 70,
+           xmax = alpha_peak + 7,
+           ymin = 0, ymax = Inf,
+           fill = "grey50",alpha = 0.2)+
+  annotate("text",
+           x = c(alpha_peak-63,
+                 alpha_peak-45, 
+                 alpha_peak-24, 
+                 alpha_peak),
+           y = rep(4e6, 4),
+           label = LETTERS[2:5],
+           size = 12)+
+  annotate("segment", 
+           y = c(1.85e6,2.1e6,2.75e6,3.2e6),
+           yend = rep(4e6,4),
+           x = c(alpha_peak-63,
+                 alpha_peak-45, 
+                 alpha_peak-24, 
+                 alpha_peak),
+           xend = c(alpha_peak-63,
+                    alpha_peak-45, 
+                    alpha_peak-24, 
+                    alpha_peak),
+           color = "grey50",
+           linetype = "dashed")+
+  ## Delta wave marks
+  annotate("rect",
+           xmin = delta_peak_week - 70,
+           xmax = delta_peak_week + 7,
+           ymin = 0, ymax = Inf,
+           fill = "grey50",alpha = 0.2)+
+  annotate("text",
+           x = c(delta_peak-63,
+                 delta_peak-45, 
+                 delta_peak-24, 
+                 delta_peak),
+           y = rep(0, 4),
+           label = LETTERS[6:9],
+           size = 12)+
+  annotate("segment", 
+           y = rep(1e4,4),
+           yend = c(1.5e6,2e6,2.75e6,3.25e6),
+           x = c(delta_peak-63,
+                 delta_peak-45, 
+                 delta_peak-24, 
+                 delta_peak),
+           xend = c(delta_peak-63,
+                    delta_peak-45, 
+                    delta_peak-24, 
+                    delta_peak),
+           color = "grey50",
+           linetype = "dashed")
+fig2a
+
+ggsave(filename = "img/extra_figures/fig2a_new.png",
+       plot = fig2a,
+       width = 16,
+       height =9, 
+       dpi = 100)
+
+## Figure 2, TSA
 ## Breakdowns of each peaks
-breaks_plt <- c(0,seq(150,300, 20))
-labels_plt <- c("150< ",seq(150,280, 20), ' >300')
+breaks_plt <- c(0,seq(150,350, 20))
+labels_plt <- c("150< ",seq(150,330, 20), ' >350')
 limits_plt <- c(0,350)
 color_option <- "magma"
 na_color <- "grey70"
 
-fig3.a <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak-63)) |> 
+fig2.a <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (alpha_peak_week-63)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -819,30 +514,30 @@ fig3.a <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (alpha_peak-63))
-fig3.a
+  labs(title = (alpha_peak_week-63))
+fig2.a
 
-ggsave(plot = fig3.a,
-       filename = "img/extra_figures/fig3_a.png",
+ggsave(plot = fig2.a,
+       filename = "img/extra_figures/fig2_a_new.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.b <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak-42)) |> 
+fig2.b <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (alpha_peak_week-42)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -861,30 +556,30 @@ fig3.b <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (alpha_peak-42))
-fig3.b
+  labs(title = (alpha_peak_week-42))
+fig2.b
 
-ggsave(plot = fig3.b,
-       filename = "img/extra_figures/fig3_b.png",
+ggsave(plot = fig2.b,
+       filename = "img/extra_figures/fig2_b.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.c <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak-21)) |> 
+fig2.c <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (alpha_peak_week-21)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -903,30 +598,30 @@ fig3.c <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (alpha_peak-21))
-fig3.c
+  labs(title = (alpha_peak_week-21))
+fig2.c
 
-ggsave(plot = fig3.c,
-       filename = "img/extra_figures/fig3_c.png",
+ggsave(plot = fig2.c,
+       filename = "img/extra_figures/fig2_c_new.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.d <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak)) |> 
+fig2.d <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (alpha_peak_week)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -945,30 +640,30 @@ fig3.d <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (alpha_peak))
-fig3.d
+  labs(title = (alpha_peak_week))
+fig2.d
 
-ggsave(plot = fig3.d,
-       filename = "img/extra_figures/fig3_d.png",
+ggsave(plot = fig2.d,
+       filename = "img/extra_figures/fig2_d.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.e <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (delta_peak-63)) |> 
+fig2.e <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (delta_peak_week-63)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -987,30 +682,30 @@ fig3.e <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (delta_peak-63))
-fig3.e
+  labs(title = (delta_peak_week-63))
+fig2.e
 
-ggsave(plot = fig3.e,
-       filename = "img/extra_figures/fig3_e.png",
+ggsave(plot = fig2.e,
+       filename = "img/extra_figures/fig2_e.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.f <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (delta_peak-42)) |> 
+fig2.f <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (delta_peak_week-35)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -1029,30 +724,30 @@ fig3.f <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (delta_peak-42))
-fig3.f
+  labs(title = (delta_peak_week-42))
+fig2.f
 
-ggsave(plot = fig3.f,
-       filename = "img/extra_figures/fig3_f.png",
+ggsave(plot = fig2.f,
+       filename = "img/extra_figures/fig2_f.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.g <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (delta_peak-21)) |> 
+fig2.g <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (delta_peak_week-21)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -1071,30 +766,30 @@ fig3.g <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (delta_peak-21))
-fig3.g
+  labs(title = (delta_peak_week-21))
+fig2.g
 
-ggsave(plot = fig3.g,
-       filename = "img/extra_figures/fig3_g.png",
+ggsave(plot = fig2.g,
+       filename = "img/extra_figures/fig2_g.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.h <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (delta_peak)) |> 
+fig2.h <- ggplot(data = CAR_df_preomicron |> 
+                   filter(date == (delta_peak_week)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        # name = "Estimated Infections/1000/week",
@@ -1113,61 +808,74 @@ fig3.h <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(fill = guide_bins(title = "Trend Surface of infections estimated/100k/day",
+  theme(legend.position = "bottom",
+        legend.title.position = "t",
+        legend.key.width = grid::unit(1.6, "cm"))+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  theme(legend.position = "bottom",
-        legend.title.position = "top",
-        legend.key.width = grid::unit(1, "cm"))+
-  labs(title = (delta_peak))
-fig3.h
+  labs(title = (delta_peak_week))
+fig2.h
 
-ggsave(plot = fig3.h,
-       filename = "img/extra_figures/fig3_h.png",
+ggsave(plot = fig2.h,
+       filename = "img/extra_figures/fig2_h.png",
        width = 16,
        height = 9, 
        dpi = 200)
 
-fig3.vertical <- ((fig3.a / fig3.b / fig3.c / fig3.d) | (fig2.a.flip) | (fig3.e / fig3.f / fig3.g / fig3.h))+
+fig2 <- (((fig2.a | fig2.b | fig2.c | fig2.d)) / 
+           (fig2a) / 
+           ((fig2.e | fig2.f | fig2.g | fig2.h))
+         )+
   plot_layout(guides = "collect")&
-  theme(legend.position = "bottom")
-fig3.vertical
+  # plot_annotation(tag_levels = 'A')&
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+                           title.position = "left",
+                           title.hjust = 0.5),
+         color = "none")&
+  theme(legend.position = "right",
+        legend.direction = "vertical",
+        legend.title.position = "left",
+        legend.title = element_text(angle = 90, vjust = 0.5, hjust = 0.5),
+        legend.key.height = grid::unit(1.6, "cm"),
+        legend.key.width = grid::unit(1, "cm"))
+fig2
 
-ggsave(plot = fig3.vertical,
-       filename = "img/extra_figures/fig3_vertical.png",
+ggsave(plot = fig2,
+       filename = "img/fig2_new.png",
        width = 16, 
        height = 9,
        dpi = 100)
 
-ggsave(plot = fig3.vertical,
-       filename = "img/extra_figures/fig3_vertical.pdf",
+ggsave(plot = fig2,
+       filename = "img/fig2_new.pdf",
        width = 16, 
        height = 9,
        dpi = 300)
 
 ## Sensitivity Analysis
 figS2 <- ggplot(data = CAR_df_preomicron |> 
-                  filter(date %in% c(delta_peak, alpha_peak,
-                                     delta_peak-21, alpha_peak - 21,
-                                     delta_peak-42, alpha_peak - 42,
-                                     delta_peak-63, alpha_peak - 63)) |> 
+                  filter(date %in% c(delta_peak_week, alpha_peak_week,
+                                     delta_peak_week-21, alpha_peak_week - 21,
+                                     delta_peak_week-35, alpha_peak_week - 35,
+                                     delta_peak_week-63, alpha_peak_week - 63)) |> 
                   st_transform(crs=26915),
-                aes(fill = mean, 
-                    color = mean))+
+                aes(fill = log(mean+1), 
+                    color = log(mean+1)))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_c(option = color_option,
                        name = "Estimated Infections/100k",
                        direction = -1,
                        # na.value = na_color,
-                       # breaks = breaks_plt,
-                       # labels = labels_plt,
+                       breaks = breaks_plt,
+                       # labels = scales::label_math(),
                        # limits = limits_plt,
   )+
-  scale_color_viridis_b(option = color_option,
+  scale_color_viridis_c(option = color_option,
                         name = "Estimated Infections/1000/week",
                         direction = -1,
                         # na.value = na_color,
@@ -1196,8 +904,8 @@ ggsave(plot = figS2,
        dpi = 300)
 
 ## Breakdowns of each peaks
-breaks_plt <- c(0,seq(85,300, 50))
-labels_plt <- c("85< ",seq(85,280, 50), ' >300')
+breaks_plt <- c(0,seq(85,300, 20))
+labels_plt <- c("85< ",seq(85,280, 20), ' >300')
 limits_plt <- c(0,350)
 color_option <- "magma"
 na_color <- "grey70"
@@ -1212,7 +920,7 @@ figS3 <- ggplot(data = CAR_df_preomicron |>
                     color = mean))+
   geom_sf()+
   geom_sf(data = us_states,
-          color = "deeppink4",
+          color = "black",
           fill = "transparent")+
   scale_fill_viridis_b(option = color_option,
                        name = "Estimated Infections/100k",
@@ -1231,7 +939,10 @@ figS3 <- ggplot(data = CAR_df_preomicron |>
                         limits = limits_plt,
   )+
   theme_void()+
-  guides(color = "none")+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+                           title.position = "top",
+                           title.hjust = 0.5),
+         color = "none")+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1, "cm"))+
@@ -1252,57 +963,12 @@ ggsave(plot = figS3,
 
 ## Sensitivity Analys on threshold values for the risk surface
 ## Fig2A - Layered depiction on transforming estimated infections on counties polygon on hexgrid
-## Aux functions
-rotate_data <- function(data,
-                        shear_cos_x = 2,
-                        shear_sin_x = 1.2,
-                        shear_cos_y = 0,
-                        shear_sin_y = 1,
-                        x_add = 0, y_add = 0) {
-  
-  shear_matrix <- function(){ matrix(c(shear_cos_x,
-                                       shear_sin_x,
-                                       shear_cos_y,
-                                       shear_sin_y),
-                                     2,
-                                     2) }
-  
-  rotate_matrix <- function(x){
-    matrix(c(cos(x), sin(x), -sin(x), cos(x)), 2, 2)
-  }
-  data %>%
-    dplyr::mutate(
-      geometry = .$geometry * shear_matrix() +
-        c(x_add, y_add)
-    )
-}
-
-rotate_data_geom <- function(data, x_add = 0, y_add = 0) {
-  shear_matrix <- function(){ matrix(c(2, 1.2, 0, 1), 2, 2) }
-  
-  rotate_matrix <- function(x) {
-    matrix(c(cos(x), sin(x), -sin(x), cos(x)), 2, 2)
-  }
-  data %>%
-    dplyr::mutate(
-      geom = .$geom * shear_matrix() * rotate_matrix(pi/20) + c(x_add, y_add)
-    )
-}
-
-# # annotate parameters
-x = 0
-y = 0
-# color = 'gray40'
-shear_cos_x = pi/2
-shear_sin_x = -1
-shear_cos_y = 0
-shear_sin_y = pi/2
 
 ## Figure S4 correlation between trend of 'alpha', 'delta'
 library(units)
 
 ## hexgrids
-dataset <- "preomicron"
+dataset <- "meta30m_run_preomicron_daily"
 
 ## Pre-Omicron
 CAR_df_preomicron <- vroom::vroom(paste0("data-products/tsa_",
@@ -1310,11 +976,11 @@ CAR_df_preomicron <- vroom::vroom(paste0("data-products/tsa_",
                                          ".csv"))
 ## peak date
 alpha_peak <- as.Date("2020-11-19")
-delta_peak <- as.Date("2021-09-08")
+delta_peak <- as.Date("2021-09-04")
 
 figS2a <- ggplot(data = CAR_df_preomicron,
                  aes(x = mean))+
-  geom_histogram(bins = 30)+
+  geom_histogram(bins = 100)+
   theme_minimal()+
   xlim(c(0,300))+
   labs(x = expression("BYM2 Random effects " *theta ~ "(Ai)"),
@@ -1323,15 +989,21 @@ figS2a <- ggplot(data = CAR_df_preomicron,
 figS2a
 
 ecdf_mean <- ecdf(CAR_df_preomicron$mean)
+# ecdf_upper <- ecdf(CAR_df_preomicron$`0.975quant`)
+# ecdf_lower <- ecdf(CAR_df_preomicron$`0.025quant`)
+# ecdf_median <- ecdf(CAR_df_preomicron$`0.5quant`)
 
 figS2b <- ggplot(data = CAR_df_preomicron,
-                aes(x = mean, y = ecdf_mean(mean)))+
+                 aes(x = mean, y = ecdf_mean(mean)))+
   geom_line()+
+  # geom_ribbon(aes(x = mean, 
+  #                 ymin = ecdf_lower(`0.025quant`), 
+  #                 ymax = ecdf_upper(`0.975quant`)))+
+  geom_vline(xintercept = 175, linetype = "dashed")+
   theme_minimal()+
   labs(x = expression("BYM2 Random effects " *theta ~ "(Ai)"),
        y = "Percentile")+
-  # scale_y_continuous(labels = scales::label_percent())+
-  xlim(c(0, 300))
+  xlim(c(0, 350))
 figS2b
 
 library(patchwork)
@@ -1354,31 +1026,20 @@ CAR_lag_alpha <- CAR_df_preomicron |>
   left_join(hexes) |> 
   dplyr::select(hexid, date, mean, sd, geometry) |>
   st_as_sf() |> 
-  filter(date %in% c(alpha_peak, (alpha_peak-7), (alpha_peak-14), (alpha_peak-28), (alpha_peak-56)))|> 
-  mutate(contour_surface = factor(case_when(mean >= threshold_mean & date == (alpha_peak-56) ~ 0,
-                                            mean >= threshold_mean & date == (alpha_peak-28) ~ 1,
-                                            mean >= threshold_mean & date == (alpha_peak-14) ~ 2,
-                                            mean >= threshold_mean & date == (alpha_peak-7) ~ 3,
-                                            mean >= threshold_mean & date == (alpha_peak) ~ 4),
-                                  labels = c("56 days","28 days", "14 days", "7 days", "peak"),
-                                  ordered = T))|> 
+  filter(date %in% seq.Date(from = alpha_peak-63,
+                            to = alpha_peak,
+                            length.out = 63))|> 
+  mutate(contour_surface = if_else(mean >= threshold_mean, date - (alpha_peak-63), NA))|> 
   st_transform(crs = 26915)
 
 contour_alpha <- CAR_lag_alpha|> 
-  filter(!is.na(contour_surface),
-         contour_surface != "7 days") |> 
+  filter(!is.na(contour_surface)) |> 
   group_by(contour_surface, date) |> 
   summarise(geometry = st_union(geometry),
             area = format(round(units::set_units(st_area(st_union(geometry)), 
-                                          km^2),0), 
+                                                 km^2),0), 
                           big.mark = ",")) |> 
   arrange(date)
-
-## Creating the US border for the lower 48 states
-us_border <- us_states |> 
-  st_union() |> 
-  st_as_sf() |> 
-  rename(geometry = x)
 
 ## Delta
 CAR_lag_delta <- CAR_df_preomicron |> 
@@ -1386,23 +1047,18 @@ CAR_lag_delta <- CAR_df_preomicron |>
   left_join(hexes) |> 
   dplyr::select(hexid, date, mean, sd, geometry) |>
   st_as_sf() |> 
-  filter(date %in% c(delta_peak, (delta_peak-7), (delta_peak-14), (delta_peak-28), (delta_peak-56)))|> 
-  mutate(contour_surface = factor(case_when(mean >= threshold_mean & date == (delta_peak-56) ~ 0,
-                                            mean >= threshold_mean & date == (delta_peak-28) ~ 1,
-                                            mean >= threshold_mean & date == (delta_peak-14) ~ 2,
-                                            mean >= threshold_mean & date == (delta_peak-7) ~ 3,
-                                            mean >= threshold_mean & date == (delta_peak) ~ 4),
-                                  labels = c("56 days", "28 days", "7 days", "14 days", "peak"),
-                                  ordered = T))|> 
+  filter(date %in% seq.Date(from = delta_peak-63,
+                            to = delta_peak,
+                            length.out = 63))|> 
+  mutate(contour_surface = if_else(mean >= threshold_mean, date - (delta_peak-63), NA))|> 
   st_transform(crs = 26915)
 
-## Delta wave layers
 contour_delta <- CAR_lag_delta|> 
-  filter(!is.na(contour_surface),
-         contour_surface != "7 days") |> 
+  filter(!is.na(contour_surface)) |> 
   group_by(contour_surface, date) |> 
   summarise(geometry = st_union(geometry),
-            area = format(round(untis::set_units(st_area(st_union(geometry)), km^2), 0), 
+            area = format(round(units::set_units(st_area(st_union(geometry)), 
+                                                 km^2),0), 
                           big.mark = ",")) |> 
   arrange(date)
 
@@ -1414,9 +1070,9 @@ CAR_area_alpha <- CAR_df_preomicron |>
   st_as_sf() |> 
   filter(date %in% seq.Date(alpha_peak, (alpha_peak-63), length.out = 63))|> 
   filter(mean >= threshold_mean) |> 
-  mutate(days = (alpha_peak - date))|> 
+  mutate(days_to_peak = (alpha_peak - date))|> 
   st_transform(crs = 26915) |> 
-  group_by(days) |> 
+  group_by(days_to_peak) |> 
   summarise(area = units::set_units(st_area(st_union(geometry)), km^2)) |> 
   mutate(wave = "1st wave")
 
