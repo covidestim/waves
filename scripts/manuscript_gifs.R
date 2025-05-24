@@ -56,17 +56,16 @@ labels_plt <- c(seq(0,400, 100), '500+')
 limits_plt <- c(0,500)
 color_option <- "magma"
 
-hexgrid_infections_test <- hexgrid_preomicron |> 
+hexgrid_infections_test <- hexObservationsAllNoMissingGeom |> 
   filter(date == delta_peak) |>
   sf::st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
+hexgrid_preomicron <- hexObservationsAllNoMissingGeom
+
 plt_peak_delta <- ggplot()+
-  geom_sf(data = hex_spacetime_sp |> 
-            left_join(hexes) |> 
-            st_as_sf() |> 
-            st_transform(crs=26915),
-          mapping = aes(fill = log10(infections+1)))+
+  geom_sf(data = hexgrid_infections_test,
+          mapping = aes(fill = infections))+
   # geom_sf(data = hexgrid_infections_test |>
   #           filter(infectionsPC == 0),
   #         mapping = aes(),
@@ -78,16 +77,22 @@ plt_peak_delta <- ggplot()+
   #                      labels = labels_plt,
   #                      limits = limits_plt,
   #                      )+
-  khroma::scale_fill_batlow(
-    name = "Estimated Infections/100k/week",
-    reverse = F,
-    breaks = seq(0,4,1),
-    labels = scales::label_math(),
-    limits = c(0,4),
-    na.value = "transparent"
-  )+
-  theme_minimal()+
+  # khroma::scale_fill_batlow(
+  #   name = "Estimated Infections/100k/week",
+  #   reverse = T,
+  #   breaks = scales::breaks_extended(n = 7),
+  #   # labels = scales::label_math(),
+  #   limits = c(0,3800),
+  #   na.value = "transparent"
+  # )+
+  scico::scale_fill_scico(name = "Estimated Infections/100k/day",
+                          palette = "lipari",
+                          breaks = scales::breaks_extended(n=10),
+                          limits = c(0,3800), 
+                          direction = 1)+
+  theme_void()+
   theme(legend.title.position = "top",
+        panel.background = element_rect(fill = "black"),
         legend.location = "plot",
         legend.position = "bottom", 
         legend.key.width = grid::unit(3, "cm"))+
@@ -106,7 +111,7 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
       geom_sf(data = hexes,
               fill = "transparent")+
       geom_sf(data = infections,
-              aes(fill = log10(infections+1)))+
+              aes(fill = infections))+
       # scale_fill_viridis_b(option = color_option,
       #                      name = "Estimated Infections/100k/week",
       #                      direction = -1,
@@ -114,16 +119,22 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
       #                      labels = labels_plt,
       #                      limits = limits_plt,
       #                      )+
-      khroma::scale_fill_batlow(
-        name = "Estimated Infections/100k/week",
-        reverse = T,
-        breaks = seq(0,4,1),
-        labels = scales::label_math(),
-        limits = c(0,4),
-        na.value = "transparent"
-      )+
-      theme_minimal()+
+      # khroma::scale_fill_batlow(
+      #   name = "Estimated Infections/100k/day",
+      #   reverse = T,
+      #   breaks = scales::breaks_extended(n = 7),
+      #   # labels = scales::label_math(),
+      #   limits = c(0,3800),
+      #   na.value = "transparent"
+      # )+
+      scico::scale_fill_scico(name = "Estimated Infections/100k/day",
+                              palette = "lipari",
+                              breaks = scales::breaks_extended(n=10),
+                              limits = c(0,3800), 
+                              direction = 1)+
+      theme_void()+
       theme(legend.title.position = "top",
+            panel.background = element_rect(fill = "black"), ## Uncomment to not have background color
             legend.location = "plot",
             legend.position = "bottom", 
             legend.key.width = grid::unit(3, "cm"))
@@ -152,7 +163,7 @@ hexes <- hexes |>
   st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
-frame_files <- lapply(na.omit(weeks[seq(1,243, 7)]), 
+frame_files <- lapply(na.omit(weeks[seq(1,649,7)]), 
                       plt_fun, 
                       TRUE,
                       st_transform(hexgrid_preomicron, 
@@ -170,7 +181,7 @@ animation2 <- magick::image_animate(magick::image_read(frame_files),
 animation2
 
 # Specify the output file path
-output_file <- "img/weekly_hex_preomicron_meta30m_batlow.gif"
+output_file <- "img/weekly_hex_preomicron_meta30m_lipari.gif"
 
 # Save the GIF animation
 magick::image_write(animation2, output_file)

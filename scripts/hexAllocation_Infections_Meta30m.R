@@ -22,11 +22,11 @@ hexgrid_pop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_
   rename(population = metapop_30m)
 
 ## Observations
-observationsFips <- st_read("data-products/geo-hexes/observations_fullmodel.shp") |> 
+observationsFips <- st_read("data-products/geo-hexes/observations_preomicron.shp") |> 
   st_cast(to = "POLYGON")
 
 #### Also set a test date for the plots throughout the workflow
-testDate <- "2022-01-20"
+testDate <- "2021-09-08"
 
 ### Explore with a plot
 ggplot() +
@@ -102,6 +102,8 @@ InfPopAll <- data.frame(hexid = 0,
 ### Write a loop for the allocation
 filtDate <- unique(na.omit(observationsFips$date))
 
+gc()
+
 ### Write a loop for the allocation
 for (i in filtDate){
   
@@ -117,10 +119,14 @@ for (i in filtDate){
   to_id_sym <- rlang::sym(to_id)
   
   observationsFilt <- st_transform(observationsFilt, 
-                                   crs = 26915)
+                                   # crs = 'ESRI:102009' ## Uncomment for ESRI CRS geometry
+                                   crs = 26915
+                                   )
   hexgrid_pop <- st_transform(hexgrid_pop |> 
                                     filter(!is.na(interpolation_weight)), 
-                                  crs = 26915)
+                              # crs = 'ESRI:102009' ## Uncomment for ESRI CRS geometry
+                              crs = 26915
+                              )
   
   ## Creating denominators, it is the counties geometries with weight for each of them.
   denominators <- observationsFilt %>%
@@ -184,41 +190,61 @@ for (i in filtDate){
 ###############################################################################
 ### Need to remove the first row of the InfAreaAll dataframe because it was 
 ### for formatting only. 
-hexObservationsAll <- InfPopAll[-1,]  |> 
+### Done in two steps to not loose information in the process and if needed recreate the data.frames
+InfPopAll2 <- InfPopAll[-1,]
+
+hexObservationsAll <- InfPopAll2  |> 
   rename(infections = infctns) |> 
-  mutate(infectionsPC = ifelse(population == 0, 
-                               0, 
-                               (infections/population)*1e5))
+  ## This certifies we haven't allocated more infections than the population itself, 
+  ## as is done for each date it still allows for more than one infection cumulatively
+  mutate(infectionsPC = case_when(population == 0 ~ 0,
+                                  infections >= population ~ population),
+         infectionsPC = (infections/population),
+         date = as.Date(date)
+         )
 
 ### Create an SF version for plots 
 hexObservationsAllSF <- st_as_sf(hexObservationsAll)
 
-testDate <- unique(na.omit(observationsFips$date))[12]
+# testDate <- unique(na.omit(observationsFips$date))[12]
 
-### Check if we have the same number of infections 
+### Check if we have the same number of infections, our threshold here is if the loss is bigger than 10%
 if(sum(observationsFips %>% 
        st_drop_geometry() %>% 
-       filter(date == testDate) %>% 
+       filter(!is.na(infctns)) %>%
        select(infctns)) - 
    sum(hexObservationsAll %>% 
-       filter(date == testDate, is.na(infections)==FALSE) %>% 
-       select(infections)) > 1) {
+       st_drop_geometry() %>% 
+       filter(!is.na(infections)) %>% 
+       select(infections)) > 0.10*sum(observationsFips %>% 
+                                      st_drop_geometry() %>% 
+                                      filter(!is.na(infctns)) %>%
+                                      select(infctns))) {
   print("signicant loss of infections in interpolation step")
 }
 
-# hexgrid$hexid <- as.numeric(hexgrid$hexid)
-# hexObsLoad <- full_join(hexObsPreOm, hexgrid, by = "hexid")
+## Printing the loss in infections
+print(sum(hexObservationsAll %>% 
+            st_drop_geometry() %>% 
+            filter(!is.na(infections)) %>% 
+            select(infections))/sum(observationsFips %>% 
+                                      st_drop_geometry() %>% 
+                                      filter(!is.na(infctns)) %>%
+                                      select(infctns)))
 
 ### Check with a plot 
 ggplot() +
-  geom_sf(hexObservationsAllSF %>% filter(date == testDate, 
-                                          infections>0),
+  geom_sf(hexObservationsAllSF %>% 
+            filter(date == testDate, 
+                   infections>0),
           mapping=aes(fill=infections)) +
-  scale_fill_gradient(low = "thistle1", high = "deeppink4") +
-  geom_sf(hexObservationsAllSF %>% filter(infections == 0),
+  scale_fill_gradient(low = "thistle1", high = "deeppink4")+
+  geom_sf(hexObservationsAllSF %>% 
+            filter(infections == 0),
           mapping=aes(), fill="green") +
-  geom_sf(observationsFips %>% filter(date == testDate, 
-                                      infctns == 0), 
+  geom_sf(observationsFips %>% 
+            filter(date == testDate, 
+                   infctns == 0), 
           mapping=aes(), color = "red")
 
 ###############################################################################
@@ -228,30 +254,63 @@ ggplot() +
 hexObservationsAll$hexid <- as.character(hexObservationsAll$hexid)
 hexObservationsAll$infections <- as.numeric(hexObservationsAll$infections)
 
+write_csv(hexObservationsAll, 
+          file = "data-products/geo-hexes/hexid-observations_preomicron_meta30m_with_missing.csv")
+
 ### Remove missing values for infectionsPC 
 hexObservationsAllNoMissing <- hexObservationsAll %>% 
-  filter(is.na(infections) == FALSE)
+  filter(!is.na(infections))
 
 ### Remove the unnecessary columns of geometry and population
-hexObservationsAllNoMissing <- hexObservationsAllNoMissing[,] 
+hexObservationsAllNoMissing <- hexObservationsAllNoMissing|> 
+  st_drop_geometry()
 
 write_csv(hexObservationsAllNoMissing, 
-          file = "data-products/geo-hexes/hexid-observations_omicronera_meta30m.csv")
+          file = "data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv")
 
 
-hexObservationsAllNoMissingGeom <- full_join(hexObservationsAllNoMissing, 
-                                             hexgrid, 
+hexObservationsAllNoMissingGeom <- full_join(hexObservationsAllNoMissing,
+                                             hexgrid,
                                              by = "hexid")
 
-hexObservationsAllNoMissingGeom <- st_as_sf(hexObservationsAllNoMissingGeom)
+hexObservationsAllNoMissingGeom <- hexObservationsAllNoMissingGeom |> 
+  select(-geometry.x) |> 
+  rename(geometry = geometry.y) |> 
+  st_as_sf() |> 
+  # st_transform(crs = 'ESRI:102009') |> 
+  # st_transform(crs = 26915)
+  mutate(date = as.Date(date))
 
-testDate <- as.Date("2022-01-20")
+## Testing the map at Alpha peak date and 3 others, and Delta peak date and 3 others
+## peak date
+alpha_peak <- as.Date("2020-11-19")
+delta_peak <- as.Date("2021-09-08")
+
+testDates <- c(c(alpha_peak-63,
+                 alpha_peak-45, 
+                 alpha_peak-24, 
+                 alpha_peak),
+               c(delta_peak-63,
+                 delta_peak-45, 
+                 delta_peak-24, 
+                 delta_peak))
+
+hextest <- hexObservationsAll %>% 
+  select(-geometry) |> 
+  mutate(date = as.Date(date)) |> 
+  filter(date %in% testDates) |> 
+  left_join(hexes) |> 
+  st_as_sf()
 
 ggplot() +
-  geom_sf(hexObservationsAllNoMissingGeom %>% 
-            filter(date == testDate) ,
-          mapping=aes(fill=log10(infections+1))) +
-  scale_fill_viridis_c()
+  geom_sf(hextest,
+          mapping=aes(fill=infectionsPC)) +
+  scale_fill_viridis_b(name = "Estimated Infections/100k/day",
+                       breaks = scales::breaks_extended(n = 7),
+                       limits = c(0,350),
+                       option = "magma")+
+  theme_minimal()+
+  facet_wrap(.~date, nrow = 2)
   # geom_sf(hexObservationsAllNoMissingGeom %>% filter(date == testDate,
   #                                                    infectionsPC == 0),
   #         mapping=aes(), fill="green")

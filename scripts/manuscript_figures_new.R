@@ -202,35 +202,56 @@ hexes <- hexes |>
   st_transform(crs = 'ESRI:102009')
 
 ## Pre-Omicron
-hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
+hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
   select(-geometry) |>
   mutate(infectionsPC = (infections/population)*1e5) |>
-  filter(infectionsPC >= 1) |>
+  # filter(infectionsPC >= 1) |>
   left_join(hexes, by = "hexid") |>
   sf::st_as_sf()
 
 ## New hexgrid with Meta 30m population, loading again hexpop to have the original 7660 hexes
-hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
-  filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
-  st_transform(crs = 26915) |>
-  rename(population = metapop_30m)
+# hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
+#   filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
+#   st_transform(crs = 26915) |>
+#   rename(population = metapop_30m)
 
-hexgrid_preomicron_cum <- hexgrid_preomicron |>
-  st_drop_geometry() |> 
+# hexgrid_preomicron_cum <- hexgrid_preomicron 
+
+
+hexgrid_preomicron_cum <- hexObservationsAllSF |>
+  st_drop_geometry() |>
   mutate(hexid = as.character(hexid)) |>
   group_by(hexid) |> 
-  summarise(cum_infections = sum(infections)) |> 
-  left_join(hexpop|> 
-              st_drop_geometry() |>
+  summarise(cum_infections = sum(infections, na.rm = T)) |> 
+  right_join(hexgrid_pop |>  
               mutate(hexid = as.character(hexid)) |> 
-              select(hexid, population)) |> 
-  mutate(cum_infectionsPC = (cum_infections/population)*1e5) |>
-  # filter(cum_infectionsPC >= 1)|>
-  right_join(hexes) |> 
+              select(hexid, population))  |> 
+  mutate(cum_infectionsPC = cum_infections/population) |> 
   sf::st_as_sf() |> 
-  st_transform(crs = 'ESRI:102009')
+  st_transform(crs = 26915)|>
+  dplyr::mutate(logpopulation = log10(population),
+                cum_incidence = exp(log10(cum_infections) - logpopulation),
+                log_incidence = log10(cum_incidence+1))
+
+
+hexid_to_keep <- hexgrid_preomicron_cum |> 
+  filter(cum_infectionsPC >0 & cum_infectionsPC<= 10) |> 
+  pull(var = hexid)
+
+vroom::vroom_write(x = hexid_to_keep, file = "data-sources/hexid_to_keep.csv")
+  
+  # |>
+  # # filter(cum_infectionsPC >= 1)|>
+  # right_join(hexes) |> 
+  # sf::st_as_sf() |> 
+  # st_transform(crs = 'ESRI:102009')
+
+# |>
+#   dplyr::mutate(cases_fitted = mean,
+#                 incidence_fitted = exp(log10(cases_fitted+1) - logpopulation)*1e5,
+#                 log_incidence = log10(incidence_fitted+1))
 
 # breaks_plt <- seq(1,1001, 100)
 # labels_plt <- c("1>", seq(100,900, 100), '1,000+')
@@ -240,27 +261,45 @@ color_option <- "Inferno"
 ### Pre-Omicron
 us_hex_infections <- ggplot() + 
   geom_sf(hexgrid_preomicron_cum |> 
-            # filter(!is.na(cum_infections))|> 
-            st_transform(crs = 'ESRI:102009'), 
-          mapping=aes(fill = log10(cum_infections+1))) +
-  geom_sf(us_states,
-          mapping=aes(),
-          color = "black",
-          fill = "transparent")+
-  colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
+            filter(cum_infectionsPC >0 & cum_infectionsPC <=10)|>
+            st_transform(crs = 26915), 
+          mapping=aes(fill = cum_infectionsPC)) +
+  # geom_sf(us_states,
+  #         mapping=aes(),
+  #         color = "black",
+  #         fill = "transparent")+
+  colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections/Population \n (March 2020 - December 2021)",
                                                na.value = "grey60",
                                                rev = T,
-                                               breaks = seq(1,7,1),
-                                               labels = scales::label_math(),
-                                               limits = c(1,7),
+                                               # breaks = seq(1,7,1),
+                                               # labels = scales::label_math(),
+                                               # limits = c(1,7),
                                                palette = color_option)+
-  theme_minimal()+
+  theme_bw()+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
         legend.key.width = grid::unit(3, "cm"),
         axis.text = element_text(size = 6))
 us_hex_infections
+
+fig1 <- us_hex_infections+labs(title = "CBG population estimates",
+                               subtitle = "PreOmicron Model infections estimates")
+fig1
+ggsave(filename = "img/extra_figures/CBG_PreOmicronModel.png",
+       plot = fig1, width = 16, height = 9, dpi = 30)
+fig2 <- us_hex_infections+labs(title = "Meta30m population estimates",
+                               subtitle = "Full Model infections estimates")
+fig2
+ggsave(filename = "img/extra_figures/Meta30m_FullModel.png",
+       plot = fig2, width = 16, height = 9, dpi = 30)
+fig3 <- us_hex_infections+labs(title = "Meta30m population estimates",
+                               subtitle = "PreOmicron Model infections estimates")
+fig3
+ggsave(filename = "img/extra_figures/Meta30m_PreOmicronModel.png",
+       plot = fig3, width = 16, height = 9, dpi = 30)
+# 
+# (fig1 / fig2 / fig3)
 
 ggsave(filename = "img/extra_figures/fig2e.png", 
        plot = us_hex_infections,

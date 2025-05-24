@@ -7,7 +7,7 @@ CAR_df2 <- vroom::vroom("data-products/tsa_meta30m_run_preomicron_daily.csv")|>
                 incidence_fitted = exp(log10(cases_fitted+1) - logpopulation)*1e5,
                 log_incidence = log10(incidence_fitted+1))
 
-# CAR_df2 <- bind_rows(CAR_list) |>
+CAR_df2 <- bind_rows(CAR_list) |>
 #   filter(date != dates_to_rerun)
 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
@@ -270,7 +270,7 @@ magick::image_write(animation4,
                     comment = "Delta Wave movie")
 
 
-for (i in weeks) {
+for (i in test_dates) {
   hex_test <- CAR_df2 |> 
     filter(date == i)
   
@@ -281,13 +281,13 @@ for (i in weeks) {
               st_as_sf() |> 
               st_transform(crs=26915),
             mapping = aes(fill = mean))+
-    scale_fill_viridis_c(option = color_option,
+    scale_fill_viridis_c(option = "inferno",
                          name = "Estimated Infections/day",
                          direction = -1,
-                         breaks = breaks_plt,
-                         labels = labels_plt,
+                         # breaks = breaks_plt,
+                         # labels = labels_plt,
                          na.value = "steelblue4",
-                         limits = limits_plt
+                         # limits = limits_plt
     )+
     theme_minimal()+
     theme(legend.title.position = "top",
