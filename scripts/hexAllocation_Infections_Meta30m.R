@@ -197,8 +197,10 @@ hexObservationsAll <- InfPopAll2  |>
   rename(infections = infctns) |> 
   ## This certifies we haven't allocated more infections than the population itself, 
   ## as is done for each date it still allows for more than one infection cumulatively
+  ## round the infections to nearest integer, this is wrong, need to verify
   mutate(infectionsPC = case_when(population == 0 ~ 0,
-                                  infections >= population ~ population),
+                                  infections >= population ~ population,
+                                  TRUE ~ infections),
          infectionsPC = (infections/population),
          date = as.Date(date)
          )
