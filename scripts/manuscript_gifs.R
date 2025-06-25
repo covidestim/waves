@@ -56,16 +56,16 @@ labels_plt <- c(seq(0,400, 100), '500+')
 limits_plt <- c(0,500)
 color_option <- "magma"
 
-hexgrid_infections_test <- hexObservationsAllNoMissingGeom |> 
+hexgrid_infections_test <- hexObservationsAllSF |> 
   filter(date == delta_peak) |>
   sf::st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
-hexgrid_preomicron <- hexObservationsAllNoMissingGeom
+hexgrid_preomicron <- hexObservationsAllSF
 
 plt_peak_delta <- ggplot()+
   geom_sf(data = hexgrid_infections_test,
-          mapping = aes(fill = infections))+
+          mapping = aes(fill = log10(infections+1)))+
   # geom_sf(data = hexgrid_infections_test |>
   #           filter(infectionsPC == 0),
   #         mapping = aes(),
@@ -87,12 +87,12 @@ plt_peak_delta <- ggplot()+
   # )+
   scico::scale_fill_scico(name = "Estimated Infections/100k/day",
                           palette = "lipari",
-                          breaks = scales::breaks_extended(n=10),
-                          limits = c(0,3800), 
+                          na.value = "grey70",
+                          breaks = scales::breaks_extended(n=5),
+                          limits = c(0,4),
                           direction = 1)+
-  theme_void()+
+  theme_minimal()+
   theme(legend.title.position = "top",
-        panel.background = element_rect(fill = "black"),
         legend.location = "plot",
         legend.position = "bottom", 
         legend.key.width = grid::unit(3, "cm"))+
@@ -111,7 +111,7 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
       geom_sf(data = hexes,
               fill = "transparent")+
       geom_sf(data = infections,
-              aes(fill = infections))+
+              aes(fill = log10(infections+1)))+
       # scale_fill_viridis_b(option = color_option,
       #                      name = "Estimated Infections/100k/week",
       #                      direction = -1,
@@ -129,12 +129,12 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
       # )+
       scico::scale_fill_scico(name = "Estimated Infections/100k/day",
                               palette = "lipari",
-                              breaks = scales::breaks_extended(n=10),
-                              limits = c(0,3800), 
-                              direction = 1)+
-      theme_void()+
+                              breaks = scales::breaks_extended(n=5),
+                              limits = c(0,4), 
+                              direction = -1)+
+      theme_minimal()+
       theme(legend.title.position = "top",
-            panel.background = element_rect(fill = "black"), ## Uncomment to not have background color
+            # panel.background = element_rect(fill = "black"), ## Uncomment to not have background color
             legend.location = "plot",
             legend.position = "bottom", 
             legend.key.width = grid::unit(3, "cm"))

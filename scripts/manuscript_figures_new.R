@@ -202,7 +202,7 @@ hexes <- hexes |>
   st_transform(crs = 'ESRI:102009')
 
 ## Pre-Omicron
-hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron.csv") |>
+hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
   select(-geometry) |>
@@ -211,71 +211,73 @@ hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_p
   left_join(hexes, by = "hexid") |>
   sf::st_as_sf()
 
-## New hexgrid with Meta 30m population, loading again hexpop to have the original 7660 hexes
-# hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
-#   filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
-#   st_transform(crs = 26915) |>
-#   rename(population = metapop_30m)
+## Hexgrid pop
+## New hexgrid with Meta 30m population
+hexgrid_pop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
+  filter(as.integer(hexid) < 7662,
+         ## Taking out the isolated hex at Keywest
+         as.integer(hexid) != 6545) |> 
+  st_transform(crs = 26915) |>
+  rename(population = metapop_30m) |> 
+  filter(population > 0)
 
-# hexgrid_preomicron_cum <- hexgrid_preomicron 
-
-
-hexgrid_preomicron_cum <- hexObservationsAllSF |>
+## Only keep hexes with a less than 10 cumulative infections per capita
+hexgrid_preomicron_cum <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |> 
+  # hexObservationsAllSF |>
   st_drop_geometry() |>
-  mutate(hexid = as.character(hexid)) |>
+  mutate(hexid = as.character(hexid),
+         # infections = case_when(infections > population ~ population,
+         #                        population == 0 ~ 0,
+         #                        TRUE ~ infections)
+         ) |>
   group_by(hexid) |> 
   summarise(cum_infections = sum(infections, na.rm = T)) |> 
   right_join(hexgrid_pop |>  
-              mutate(hexid = as.character(hexid)) |> 
-              select(hexid, population))  |> 
+               mutate(hexid = as.character(hexid)) |> 
+               select(hexid, population))  |> 
   mutate(cum_infectionsPC = cum_infections/population) |> 
   sf::st_as_sf() |> 
-  st_transform(crs = 26915)|>
-  dplyr::mutate(logpopulation = log10(population),
-                cum_incidence = exp(log10(cum_infections) - logpopulation),
-                log_incidence = log10(cum_incidence+1))
+  st_transform(crs = 26915)
+# |>
+#   dplyr::mutate(logpopulation = log10(population),
+#                 cum_incidence = exp(log10(cum_infections) - logpopulation),
+#                 log_incidence = log10(cum_incidence+1))
 
-
+## Filter for only the hexes we are keep to the analysis
 hexid_to_keep <- hexgrid_preomicron_cum |> 
-  filter(cum_infectionsPC >0 & cum_infectionsPC<= 10) |> 
-  pull(var = hexid)
+  filter(population > 0) |> 
+  filter(cum_infectionsPC<= 10)
 
 vroom::vroom_write(x = hexid_to_keep, file = "data-sources/hexid_to_keep.csv")
-  
-  # |>
-  # # filter(cum_infectionsPC >= 1)|>
-  # right_join(hexes) |> 
-  # sf::st_as_sf() |> 
-  # st_transform(crs = 'ESRI:102009')
+write_sf(obj = hexid_to_keep,
+         dsn = "data-products/geo-hexes/hexid_to_keep.geojson",
+         delete_dsn = T,
+         delete_layer = T)
 
-# |>
-#   dplyr::mutate(cases_fitted = mean,
-#                 incidence_fitted = exp(log10(cases_fitted+1) - logpopulation)*1e5,
-#                 log_incidence = log10(incidence_fitted+1))
+hexgrid_preomicron_cum <- sf::st_read("data-products/geo-hexes/hexid-observations_preomicron_cumulative_meta30m.geojson")
 
 # breaks_plt <- seq(1,1001, 100)
 # labels_plt <- c("1>", seq(100,900, 100), '1,000+')
 # limits_plt <- c(0,1000)
-color_option <- "Inferno"
+color_option <- "inferno"
 
 ### Pre-Omicron
 us_hex_infections <- ggplot() + 
   geom_sf(hexgrid_preomicron_cum |> 
-            filter(cum_infectionsPC >0 & cum_infectionsPC <=10)|>
+            # filter(cum_infectionsPC >0 & cum_infectionsPC <=10)|>
             st_transform(crs = 26915), 
-          mapping=aes(fill = cum_infectionsPC)) +
+          mapping=aes(fill = log10(cum_infections+1))) +
   # geom_sf(us_states,
   #         mapping=aes(),
   #         color = "black",
   #         fill = "transparent")+
-  colorspace::scale_fill_continuous_sequential(name = "Cumulative Infections/Population \n (March 2020 - December 2021)",
-                                               na.value = "grey60",
-                                               rev = T,
-                                               # breaks = seq(1,7,1),
-                                               # labels = scales::label_math(),
-                                               # limits = c(1,7),
-                                               palette = color_option)+
-  theme_bw()+
+  scico::scale_fill_scico(name = "Cumulative Infections/Population \n (March 2020 - December 2021)",
+                          # direction = -1,
+                          palette = "lipari",
+                          breaks = seq(0,7,1),
+                          labels = scales::label_math(),
+                          limits = c(0,7))+
+  theme_minimal()+
   theme(legend.position = "bottom", 
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
@@ -410,14 +412,6 @@ CAR_df_preomicron <- vroom::vroom(paste0("data-products/tsa_",
                                          dataset, 
                                          ".csv"))
 
-## Pre-Omicron
-CAR_df_preomicron <- CAR_df_preomicron |> 
-  mutate(hexid = as.character(hexid)) |> 
-  left_join(hexes) |> 
-  select(hexid, date, population, infections, infectionsPC, mean, sd, geometry) |>
-  st_as_sf() |> 
-  st_transform(crs = 'ESRI:102009')
-
 ## Fig.2 Spatial hexes, population and infections
 
 fig2a_data <- CAR_df_preomicron |> 
@@ -427,6 +421,14 @@ fig2a_data <- CAR_df_preomicron |>
           infectionsPC = sum(infectionsPC, na.rm = T),
           .by = "date") |> 
   arrange(desc(date))
+
+## Pre-Omicron
+CAR_df_preomicron <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  # select(hexid, date, population, infections, infectionsPC, mean, sd) |>
+  left_join(hexes |> 
+              st_transform(crs = 26915)) |> 
+  st_as_sf()
 
 # # Function that finds the closest date in a vector of dates.
 # find_closest_date <- function(date, date_vector)
@@ -442,8 +444,8 @@ fig2a_data <- CAR_df_preomicron |>
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-04")
 
-alpha_peak_week <- as.Date("2020-11-28")
-delta_peak_week <- as.Date("2021-09-04")
+# alpha_peak_week <- as.Date("2020-11-28")
+# delta_peak_week <- as.Date("2021-09-04")
 
 fig2a <- ggplot()+
   geom_line(data = fig2a_data,
@@ -468,12 +470,12 @@ fig2a <- ggplot()+
                  alpha_peak-45, 
                  alpha_peak-24, 
                  alpha_peak),
-           y = rep(4e6, 4),
+           y = rep(2e6, 4),
            label = LETTERS[2:5],
            size = 12)+
   annotate("segment", 
-           y = c(1.85e6,2.1e6,2.75e6,3.2e6),
-           yend = rep(4e6,4),
+           y = c(0.5e6,0.75e6,1.5e6,1.75e6),
+           yend = rep(2e6,4),
            x = c(alpha_peak-63,
                  alpha_peak-45, 
                  alpha_peak-24, 
@@ -486,8 +488,8 @@ fig2a <- ggplot()+
            linetype = "dashed")+
   ## Delta wave marks
   annotate("rect",
-           xmin = delta_peak_week - 70,
-           xmax = delta_peak_week + 7,
+           xmin = delta_peak - 70,
+           xmax = delta_peak + 7,
            ymin = 0, ymax = Inf,
            fill = "grey50",alpha = 0.2)+
   annotate("text",
@@ -500,7 +502,7 @@ fig2a <- ggplot()+
            size = 12)+
   annotate("segment", 
            y = rep(1e4,4),
-           yend = c(1.5e6,2e6,2.75e6,3.25e6),
+           yend = c(0.25e6,0.65e6,1.45e6,1.75e6),
            x = c(delta_peak-63,
                  delta_peak-45, 
                  delta_peak-24, 
@@ -528,7 +530,7 @@ color_option <- "magma"
 na_color <- "grey70"
 
 fig2.a <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak_week-63)) |> 
+                   filter(date == (alpha_peak-63)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
@@ -560,7 +562,7 @@ fig2.a <- ggplot(data = CAR_df_preomicron |>
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  labs(title = (alpha_peak_week-63))
+  labs(title = (alpha_peak-63))
 fig2.a
 
 ggsave(plot = fig2.a,
@@ -570,7 +572,7 @@ ggsave(plot = fig2.a,
        dpi = 200)
 
 fig2.b <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak_week-42)) |> 
+                   filter(date == (alpha_peak-42)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
@@ -602,7 +604,7 @@ fig2.b <- ggplot(data = CAR_df_preomicron |>
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  labs(title = (alpha_peak_week-42))
+  labs(title = (alpha_peak-42))
 fig2.b
 
 ggsave(plot = fig2.b,
@@ -612,7 +614,7 @@ ggsave(plot = fig2.b,
        dpi = 200)
 
 fig2.c <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak_week-21)) |> 
+                   filter(date == (alpha_peak-21)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
@@ -644,7 +646,7 @@ fig2.c <- ggplot(data = CAR_df_preomicron |>
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  labs(title = (alpha_peak_week-21))
+  labs(title = (alpha_peak-21))
 fig2.c
 
 ggsave(plot = fig2.c,
@@ -654,7 +656,7 @@ ggsave(plot = fig2.c,
        dpi = 200)
 
 fig2.d <- ggplot(data = CAR_df_preomicron |> 
-                   filter(date == (alpha_peak_week)) |> 
+                   filter(date == (alpha_peak)) |> 
                    st_transform(crs=26915),
                  aes(fill = mean, 
                      color = mean))+
@@ -686,7 +688,7 @@ fig2.d <- ggplot(data = CAR_df_preomicron |>
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  labs(title = (alpha_peak_week))
+  labs(title = (alpha_peak))
 fig2.d
 
 ggsave(plot = fig2.d,

@@ -86,8 +86,8 @@ InfPopAll <- data.frame(hexid = 0,
 
 ## Checking if CRS are equal
 if(st_crs(hexgrid_pop) == st_crs(observationsFips)){
-  hexgrid_pop <- st_transform(hexgrid_pop, crs = 4326)
-  observationsFips <- st_transform(observationsFips, crs = 4326)
+  hexgrid_pop <- st_transform(hexgrid_pop, crs = 26915)
+  observationsFips <- st_transform(observationsFips, crs = 26915)
 }
 
 ### Create an empty dataframe to hold the results
@@ -137,7 +137,8 @@ for (i in filtDate){
     dplyr::summarize(weight_total = sum(!!weight_sym,
                                         na.rm = TRUE))
   
-  ## Creating intersections, it is the left_join of infections counts on counties geometries with the denominators, same geometries. Then, we intersect the hex with populations counts. After we group by the mix of geometries, counties and hexes, 
+  ## Creating intersections, it is the left_join of infections counts on counties geometries with the denominators, same geometries. 
+  ## Then, we intersect the hex with populations counts. After we group by the mix of geometries, counties and hexes, 
   intersections <- observationsFilt |>
     dplyr::left_join(denominators, by = from_id) |> 
     sf::st_intersection(hexgrid_pop)%>%
@@ -195,18 +196,23 @@ InfPopAll2 <- InfPopAll[-1,]
 
 hexObservationsAll <- InfPopAll2  |> 
   rename(infections = infctns) |> 
-  ## This certifies we haven't allocated more infections than the population itself, 
+  ## This certifies we haven't allocated more infections than the population itself to hex, 
   ## as is done for each date it still allows for more than one infection cumulatively
-  ## round the infections to nearest integer, this is wrong, need to verify
-  mutate(infectionsPC = case_when(population == 0 ~ 0,
+  ## We don't wanna to produce infections where there is population but no infections allocated or ever estimated, like Nebraska
+  mutate(infections = case_when(population == 0 ~ 0,
                                   infections >= population ~ population,
-                                  TRUE ~ infections),
+                                  TRUE ~ infections), ## This is an easy fix
          infectionsPC = (infections/population),
          date = as.Date(date)
-         )
+  )
 
 ### Create an SF version for plots 
 hexObservationsAllSF <- st_as_sf(hexObservationsAll)
+
+st_write(obj = hexObservationsAllSF,
+         paste0("data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson"),
+         delete_layer = T,
+         delete_dsn = T)
 
 # testDate <- unique(na.omit(observationsFips$date))[12]
 
@@ -242,6 +248,7 @@ ggplot() +
           mapping=aes(fill=infections)) +
   scale_fill_gradient(low = "thistle1", high = "deeppink4")+
   geom_sf(hexObservationsAllSF %>% 
+            filter(date == testDate) |> 
             filter(infections == 0),
           mapping=aes(), fill="green") +
   geom_sf(observationsFips %>% 
@@ -279,9 +286,67 @@ hexObservationsAllNoMissingGeom <- hexObservationsAllNoMissingGeom |>
   select(-geometry.x) |> 
   rename(geometry = geometry.y) |> 
   st_as_sf() |> 
+  st_transform(crs = 4326) |> 
   # st_transform(crs = 'ESRI:102009') |> 
   # st_transform(crs = 26915)
   mutate(date = as.Date(date))
+
+st_write(obj = hexObservationsAllNoMissingGeom,
+         paste0("data-products/geo-hexes/hexid-observations_preomicron_meta30m_nomissing.geojson"),
+         delete_layer = T,
+         delete_dsn = T)
+
+## HexObservations summarised for cumulative infections
+
+hexObservationsAllSF <- sf::st_read("data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson")
+
+library(collapse)
+hexObservationsCum <- hexObservationsAllSF |> 
+  collapse::fgroup_by(hexid) |> 
+  collapse::fsummarise(cum_infections = collapse::fsum(infections),
+                       geometry = sf::st_union(geometry)) ## st_union over each hexid, so it will produce again the hexes
+
+st_write(obj = hexObservationsCum,
+         paste0("data-products/geo-hexes/hexid-observations_preomicron_cumulative_meta30m.geojson"),
+         delete_layer = T,
+         delete_dsn = T)
+
+## Plotting the cumulative
+color_option <- "inferno"
+
+crs <- 'ESRI:102009'
+### Pre-Omicron
+ggplot() + 
+  geom_sf(hexObservationsCum |> 
+            # filter(cum_infectionsPC >0 & cum_infectionsPC <=10)|>
+            st_transform(crs = crs), 
+          mapping=aes(fill = log10(cum_infections+1))) +
+  geom_sf(us_states |> 
+            st_transform(crs = crs),
+          mapping=aes(),
+          color = "steelblue1",
+          fill = "transparent")+
+  # scale_fill_viridis_c(name = "Cumulative Infections/Population \n (March 2020 - December 2021)",
+  #                      option = "inferno",
+  #                      # direction = -1,
+  #                      na.value = "grey70",
+  #                      # rev = T,
+  #                      breaks = seq(0,7,1),
+  #                      labels = scales::label_math(),
+  #                      limits = c(0,7)
+  # )+
+  scico::scale_fill_scico(name = "Cumulative Infections/Population \n (March 2020 - December 2021)",
+                          # direction = -1,
+                          palette = "lipari",
+                          breaks = seq(0,7,1),
+                          labels = scales::label_math(),
+                          limits = c(0,7))+
+  theme_minimal()+
+  theme(legend.position = "bottom", 
+        legend.title.position = "top",
+        legend.title = element_text(hjust = 0.5),
+        legend.key.width = grid::unit(3, "cm"),
+        axis.text = element_text(size = 10))
 
 ## Testing the map at Alpha peak date and 3 others, and Delta peak date and 3 others
 ## peak date
@@ -301,15 +366,15 @@ hextest <- hexObservationsAll %>%
   select(-geometry) |> 
   mutate(date = as.Date(date)) |> 
   filter(date %in% testDates) |> 
-  left_join(hexes) |> 
+  left_join(hexgrid) |> 
   st_as_sf()
 
 ggplot() +
   geom_sf(hextest,
-          mapping=aes(fill=infectionsPC)) +
-  scale_fill_viridis_b(name = "Estimated Infections/100k/day",
-                       breaks = scales::breaks_extended(n = 7),
-                       limits = c(0,350),
+          mapping=aes(fill=log10(infections+1))) +
+  scale_fill_viridis_c(name = "Estimated Infections/100k/day",
+                       # breaks = scales::breaks_extended(n = 7),
+                       # limits = c(0,350),
                        option = "magma")+
   theme_minimal()+
   facet_wrap(.~date, nrow = 2)
@@ -329,7 +394,3 @@ ggplot() +
 #   crs = st_crs(hexObservationsAllNoMissingGeom),
 #   overwrite = T,
 # )
-
-st_write(obj = hexObservationsAllNoMissingGeom,
-         paste0("data-products/geo-hexes/hexid-observations_omicronera_meta30m.geojson"),
-         delete_dsn = T)

@@ -7,13 +7,16 @@ CAR_df2 <- vroom::vroom("data-products/tsa_meta30m_run_preomicron_daily.csv")|>
                 incidence_fitted = exp(log10(cases_fitted+1) - logpopulation)*1e5,
                 log_incidence = log10(incidence_fitted+1))
 
-CAR_df2 <- bind_rows(CAR_list) |>
+hexes_to_keep <- st_read("data-products/geo-hexes/hexid_to_keep.geojson")
+
+# CAR_df2 <- bind_rows(CAR_list) |>
 #   filter(date != dates_to_rerun)
 
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
   filter(as.integer(hexid) < 7662,
          ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545) |> 
+         as.integer(hexid) != 6545,
+         hexid %in% as.character(hexes_to_keep$hexid)) |> 
   st_transform(crs = 4326) |> 
   mutate(hexid = as.character(1:n()))
 
@@ -62,8 +65,8 @@ color_option <- "magma"
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-08")
 
-alpha_peak_week <- as.Date("2020-11-28")
-delta_peak_week <- as.Date("2021-09-04")
+# alpha_peak_week <- as.Date("2020-11-28")
+# delta_peak_week <- as.Date("2021-09-04")
 
 hex_test <- CAR_df2 |> 
   filter(date == delta_peak)
@@ -120,42 +123,21 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
     filter(date == week)
   
   plot_alphas <- ggplot()+
-    # geom_sf(data = hexes|>
-    #           st_transform(crs=26915),
-    #         fill = "transparent")+
     geom_sf(data = infections|> 
               left_join(hexes) |> 
               st_as_sf() |> 
               st_transform(crs=26915),
-            mapping = aes(fill = log10(mean+1)))+
-    # scale_fill_viridis_b(option = "magma",
-    #                      name = "Estimated Infections/100k/week",
-    #                      direction = -1,
-    #                      # breaks = seq(0,5, 0.5),
-    #                      # n.breaks = 20,
-    #                      breaks = breaks_plt,
-    #                      labels = labels_plt,
-    #                      limits = limits_plt,
-    #                      na.value = "transparent"
-    # )+
-    scale_fill_viridis_c(option = color_option,
-                         name = "Estimated Infections",
+            mapping = aes(fill = mean))+
+    scale_fill_viridis_b(option = "magma",
+                         name = "Estimated Infections/100k/week",
                          direction = -1,
-                         breaks = seq(1,8, 1),
-                         labels = scales::label_math(),
-                         na.value = "steelblue1",
-                         # limits = limits_plt
+                         # breaks = seq(0,5, 0.5),
+                         # n.breaks = 20,
+                         breaks = breaks_plt,
+                         labels = labels_plt,
+                         limits = limits_plt,
+                         na.value = "transparent"
     )+
-    # scale_color_viridis_b(option = "magma",
-    #                      name = "Estimated Infections/100k/week",
-    #                      direction = -1,
-    #                      # breaks = seq(0,5, 0.5),
-    #                      # n.breaks = 20,
-    #                      breaks = breaks_plt3,
-    #                      labels = labels_plt3,
-    #                      limits = limits_plt3,
-    #                      na.value = "transparent"
-    # )+
     theme_minimal(base_size = 12)+
     theme(legend.title.position = "top",
           plot.background = element_rect(fill = "white", colour = NA),
@@ -184,14 +166,14 @@ plt_fun <- \(week, is.omicron = FALSE, infections, hexes, plot_img = TRUE) {
   return(paste0("img/movies/frame_for_week_", week, ".png"))
 }
 
-weeks <- sort(unique(CAR_df2$date))
+weeks <- sort(unique(na.omit(CAR_df2$date)))
 
 hexes <- hexes |>
   filter(as.integer(hexid)<7662) |> 
   st_transform(crs = 26915) |> 
   sf::st_as_sf()
 
-frame_files <- lapply(na.omit(weeks[seq(1,649, 7)]), 
+frame_files <- lapply(na.omit(weeks[seq(1,length(weeks), 7)]), 
                       plt_fun, 
                       TRUE,
                       CAR_df2, 
@@ -270,7 +252,7 @@ magick::image_write(animation4,
                     comment = "Delta Wave movie")
 
 
-for (i in test_dates) {
+for (i in weeks) {
   hex_test <- CAR_df2 |> 
     filter(date == i)
   
@@ -281,13 +263,13 @@ for (i in test_dates) {
               st_as_sf() |> 
               st_transform(crs=26915),
             mapping = aes(fill = mean))+
-    scale_fill_viridis_c(option = "inferno",
+    scale_fill_viridis_b(option = "magma",
                          name = "Estimated Infections/day",
                          direction = -1,
-                         # breaks = breaks_plt,
-                         # labels = labels_plt,
+                         breaks = breaks_plt,
+                         labels = labels_plt,
                          na.value = "steelblue4",
-                         # limits = limits_plt
+                         limits = limits_plt
     )+
     theme_minimal()+
     theme(legend.title.position = "top",
