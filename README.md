@@ -53,17 +53,20 @@ Creates gifs of the CAR model results
 
 Script to create all figures in the manuscript and supplement
 
-### Figures
+### /figures
 
 Folder holding .pdf and .png figures for the manuscript
 
 #### /extra_figures
 
-Supplemental figures and extra created figures
+Supplemental figures and extra created figures.
 
 #### /img
 
 Folder containing .gif and .mov files of the movies of the wavefront expansion and wavefront speed computation
 
+#### /wavefronts
+
+Folder to store the individual pngs to make the gifs of wavefronts and wavefront speed. As these files are large, we provide only one example figure in each directory. It can be filled by the user using `6_compute-wavefront-speed.R`.
 
 
