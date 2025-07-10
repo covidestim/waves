@@ -15,13 +15,13 @@ first_peak <- as.Date("2020-11-19")
 second_peak <- as.Date("2021-09-04")
 
 ### Read in the stable hex grid
-hexgrid <- readRDS(here("data-products/hexgrid.rds")) %>% 
-  mutate(hexid = as.integer(hexid))
+hexgrid <- sf::st_read(here("data-products/geo-hexes/hexgrid2025.shp")) %>% 
+  mutate(hexid = as.character(hexid))
 
 ### Load in the new observations from the CAR model
-obs <- read.csv("~/Downloads/tsa_meta30m_run_preomicron_daily.csv", 
+obs <- read.csv(here("data-products/tsa_meta30m_run_preomicron_daily.csv"), 
                 sep = "\t") %>% 
-  mutate(hexid = as.integer(hexid), 
+  mutate(hexid = as.character(hexid), 
          date = as.Date(date), 
          mean = as.numeric(mean))
 
@@ -63,13 +63,13 @@ for(i in -63:0){
                                       infThreshold = inf_threshold, 
                                       t = date)
     
-    png(here(paste0("boundaryPlots/firstNewModel/plot", date, ".png")))
+    png(here(paste0("figures/wavefronts/firstWave/plot", date, ".png")))
     print(boundList[[i+64]]["boundary plot"])
     dev.off()
 }
 
-saveRDS(boundList, file = here("boundaryPlots/firstNewModel/boundaryDatafirst.rds"), version = 2)
-# boundList <- readRDS("boundaryPlots/first/boundaryDatafirst.rds")
+saveRDS(boundList, file = here("data-products/wavefronts/boundaryData_firstWave.rds"), version = 2)
+# boundList <- readRDS("figures/wavefronts/first/boundaryDatafirst.rds")
 
 ###############################################################################
 ########### CALCULATE AND PLOT DISTANCE TO NEAREST POINT ######################
@@ -92,10 +92,10 @@ for (i in 2:length(boundList)){
 }
 
 ### Save for future use ### 
-saveRDS(distanceToFrontier, here("boundaryPlots/firstNewModel/firstDistanceToFrontier.rds"), version = 2)
+saveRDS(distanceToFrontier, here("data-products/wavefronts/distanceToFrontier_firstWave.rds"), version = 2)
 
 ### Read in the distance data ### 
-# distanceToFrontier <- readRDS(here("boundaryPlots/firstDistanceToFrontier.rds"))
+# distanceToFrontier <- readRDS(here("figures/wavefronts/firstDistanceToFrontier.rds"))
 
 for(i in 1:63){
   date <- unique(distanceToFrontier[[i]]$date)
@@ -111,12 +111,12 @@ for(i in 1:63){
                           name = "Distance to nearest point\non boundary at t+1\n(in kms)") +
     ggtitle(paste(date))
   
-  png(here(paste0("boundaryPlots/firstNewModel/distFront-singleScale/plot", date, ".png")))
+  png(here(paste0("figures/wavefronts/firstWave/distFront-singleScale/plot", date, ".png")))
   print(plotDistFront)
   dev.off()
 }
 
-distFrontPlots <- list.files(here("boundaryPlots/firstNewModel/distFront-singleScale"), full.names = TRUE)
+distFrontPlots <- list.files(here("figures/wavefronts/firstWave/distFront-singleScale"), full.names = TRUE)
 distFrontPlotList <- lapply(distFrontPlots, image_read)
 
 ## join the images together 
@@ -128,7 +128,7 @@ distFrontAnimated <- image_animate(distFrontJoined, fps = 2)
 distFrontAnimated
 
 image_write(image = distFrontAnimated,
-            path = "~/waves/boundaryPlots/firstNewModel/distFront-singleScale/distFrontSingleAnimated.gif")
+            path = here("figures/wavefronts/firstWave/distFront-singleScale/distFrontSingleAnimated.gif"))
 
 ###############################################################################
 ###########################     second WAVE      ###############################
@@ -142,14 +142,14 @@ for(i in -63:0){
                                     infThreshold = inf_threshold, 
                                     t = date)
   
-  png(paste0("~/waves/boundaryPlots/secondNewModel/plot", date, ".png"))
+  png(paste0(here("figures/wavefronts/secondWave/plot", date, ".png")))
   print(boundList[[i+64]]["boundary plot"])
   dev.off()
 }
 
-saveRDS(boundList, file = "boundaryPlots/secondNewModel/boundaryDatasecond.rds", version = 2)
+saveRDS(boundList, file = here("data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
 
-# boundList <- readRDS("boundaryPlots/second/boundaryDatasecond.rds")
+# boundList <- readRDS(here("figures/wavefronts/second/boundaryDatasecond.rds"))
 
 ## calculate growth of wave front 
 growth <- vector()
@@ -165,6 +165,10 @@ for (i in 2:length(boundList)){
   colnames(x2)[3] <- "distToFront"
   distanceToFrontier[[i-1]] <- x2
 }
+
+### Save for future use ### 
+saveRDS(distanceToFrontier, here("data-products/wavefronts/distanceToFrontier_secondWave.rds"), version = 2)
+
 ###############################################################################
 ########### CALCULATE AND PLOT DISTANCE TO NEAREST POINT ######################
 ########### ON THE FRONTIER FOR EACH LINESTRING AT EACH #######################
@@ -193,12 +197,12 @@ for(i in 1:63){
     theme_bw() + 
     ggtitle(paste(date))
   
-  png(paste0("~/waves/boundaryPlots/secondNewModel/distFront-singleScale/plot", date, ".png"))
+  png(paste0(here("figures/wavefronts/secondWave/distFront-singleScale/plot", date, ".png")))
   print(plotDistFront)
   dev.off()
 }
 
-distFrontPlots <- list.files("~/waves/boundaryPlots/secondNewModel/distFront-singleScale", full.names = TRUE)
+distFrontPlots <- list.files(here("figures/wavefronts/secondWave/distFront-singleScale"), full.names = TRUE)
 distFrontPlotList <- lapply(distFrontPlots, image_read)
 
 ## join the images together 
@@ -210,6 +214,6 @@ distFrontAnimated <- image_animate(distFrontJoined, fps = 2)
 distFrontAnimated
 
 image_write(image = distFrontAnimated,
-            path = "~/waves/boundaryPlots/secondNewModel/distFront-singleScale/distFrontSingleAnimated.gif")
+            path = here("figures/wavefronts/secondWave/distFront-singleScale/distFrontSingleAnimated.gif"))
 
 
