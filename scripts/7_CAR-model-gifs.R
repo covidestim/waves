@@ -12,7 +12,7 @@ hexes_to_keep <- st_read("data-products/geo-hexes/hexid_to_keep.geojson")
 # CAR_df2 <- bind_rows(CAR_list) |>
 #   filter(date != dates_to_rerun)
 
-hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
+hexes <- sf::st_read("data-products/geo-hexes/hexgrid2025.shp") |> 
   filter(as.integer(hexid) < 7662,
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6545,
