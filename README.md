@@ -1,6 +1,6 @@
 # Quantifying the spatiotemporal dynamics of the first two epidemic waves of SARS-CoV-2 infections in the United States
 
-This repo stores code and data to reproduce the analysis in the manuscript, Quantifying the spatiotemporal dynamics of the first two epidemic waves of SARS-CoV-2 infections in the United States, currently in review at PLOS Computational Biology.
+This repo stores code and data to reproduce the analysis in the manuscript, "Quantifying the spatiotemporal dynamics of the first two epidemic waves of SARS-CoV-2 infections in the United States", currently under review at PLOS Computational Biology.
 
 ## Project description 
 
