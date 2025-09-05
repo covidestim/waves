@@ -203,14 +203,14 @@ hexgrid_pop <- st_read("Data/data-sources/hexgrid_meta30m_population.geojson") |
   rename(population = metapop_30m)
 
 ## Pre-Omicron
-hexgrid_preomicron <- vroom::vroom("Data/data-products/hexid-observations_preomicron_meta30m.csv") |>
-  mutate(hexid = as.character(hexid),
-         date = as.Date(date)) |>
-  select(-geometry) |>
-  mutate(infectionsPC = (infections/population)*1e5) |>
-  # filter(infectionsPC >= 1) |>
-  left_join(hexgrid_pop |> select(hexid, geometry) |> mutate(hexid = as.character()), by = "hexid") |>
-  sf::st_as_sf()
+# hexgrid_preomicron <- vroom::vroom("Data/data-products/hexid-observations_preomicron_meta30m.csv") |>
+#   mutate(hexid = as.character(hexid),
+#          date = as.Date(date)) |>
+#   select(-geometry) |>
+#   mutate(infectionsPC = (infections/population)*1e5) |>
+#   # filter(infectionsPC >= 1) |>
+#   left_join(hexgrid_pop |> select(hexid, geometry) |> mutate(hexid = as.character()), by = "hexid") |>
+#   sf::st_as_sf()
 
 ## Only keep hexes with a less than 10 cumulative infections per capita
 hexgrid_preomicron_cum <- vroom::vroom("Data/data-products/hexid-observations_preomicron_meta30m.csv") |> 
@@ -389,14 +389,14 @@ fig1 <- (hexpop_zoom / hex_infections)+
 fig1
 
 ggsave(plot = fig1,
-       file = "Figures/fig1_new.png",
+       file = "Figures/fig1.png",
        width = 9,
        height = 16,
        dpi = 300
 )
 
 ggsave(plot = fig1,
-       file = "Figures/fig1_new.pdf",
+       file = "Figures/fig1.tiff",
        width = 9,
        height = 16,
        dpi = 300
@@ -511,6 +511,7 @@ breaks_plt <- c(0,seq(150,350, 20))
 labels_plt <- c("150< ",seq(150,330, 20), ' >350')
 limits_plt <- c(0,350)
 color_option <- "magma"
+na_color <- "grey80"
 
 ## Make the plots with the gif codes
 
@@ -526,7 +527,6 @@ alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-04")
 
 ## 1st Wave snapshots
-
 fig2.b <- ggplot()+
   geom_sf(data = CAR_df_preomicron |> 
             filter(date == alpha_peak-63) |> 
@@ -1048,16 +1048,16 @@ figS2b <- ggplot(data = CAR_df_preomicron,
   xlim(c(0, 350))
 figS2b
 
-library(patchwork)
+# library(patchwork)
 
-figS2 <- (figS2a | figS2b)
-figS2
+# figS2 <- (figS2a | figS2b)
+# figS2
 
-ggsave(filename = "Figures/extra_figures/figS1.png",
-       plot = figS2,
-       width = 16, 
-       height = 9, 
-       dpi = 100)
+# ggsave(filename = "Figures/extra_figures/figS1.png",
+#        plot = figS2,
+#        width = 16, 
+#        height = 9, 
+#        dpi = 100)
 
 ## Threshold for filtering given the distribution, any value of trend that it is above the 3rd Quarter of the trend distribution
 threshold_mean <- 165
