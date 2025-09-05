@@ -124,6 +124,8 @@ Data/data-products/boundaryPlots/secondWaveModel/boundaryDatasecond.rds
 Data/data-products/hexid-observations_preomicron_meta30m.csv
 Data/data-products/tsa_meta30m_run_preomicron_daily.csv
 Data/data-products/tsa_preomicron.csv
+Data/data-products/wavefronts/boundaryData_firstWave.rds
+Data/data-products/wavefronts/boundaryData_secondWave.rds
 Data/data-sources/cbg-polygons/cb_2019_us_bg_500k.shp
 img/besag2_test_week.gif
 img/daily_hex_preomicron.gif
