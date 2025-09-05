@@ -1285,10 +1285,29 @@ fig4a
 
 ggsave(plot = fig4a, filename = "Figures/fig4a.png", width = 16, height = 9, dpi = 300)
 
+fig4b <- ggplot()+
+  geom_col(data = waveStatsJoined,
+           aes(x = `Days before peak`, y = `Median speed (km/day)`, fill = wave),
+           alpha = 0.75,
+           position = position_dodge())+
+  geom_vline(xintercept = 7, color = "grey80", lty = "dashed")+
+  geom_vline(xintercept = seq(7,63,7), lty = "dotted", color = "grey50")+
+  theme_minimal()+
+  labs(x = "Days before national curve peak", 
+       y = "Recruitment rate \n [km2/day]")+
+  scale_x_reverse(breaks = seq(7,63,7))+
+  theme(legend.position = c(0.10,0.90),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(hjust = 0.5),
+        axis.text = element_text(size = 12))
+fig4b
+
+ggsave(plot = fig4b, filename = "Figures/fig4b.png", width = 16, height = 9, dpi = 300)
+
+## Wavefront speed figure
+## first wave panels
 firstBound <- st_read("Data/data-products/firstWaveBound.shp")
 secondBound <- st_read("Data/data-products/secondWaveBound.shp")
-
-## first wave panels
 
 date_displayed <- alpha_peak-63
 plt1 <- ggplot() + 
