@@ -15,12 +15,12 @@ first_peak <- as.Date("2020-11-19")
 second_peak <- as.Date("2021-09-04")
 
 ### Read in the stable hex grid
-hexgrid <- sf::st_read(here("data-products/geo-hexes/hexgrid2025.shp")) %>%
+hexgrid <- sf::st_read(here("Data/data-products/geo-hexes/hexgrid2025.shp")) %>%
 mutate(hexid = as.character(hexid))
 
 ### Load in the new observations from the CAR model
 # obs <- readRDS(here("data-products/tsa_meta30m_run_preomicron_daily.rds"))  %>% 
-obs <- read.csv(here("data-products/tsa_meta30m_run_preomicron_daily.csv"), 
+obs <- read.csv(here("Data/data-products/tsa_meta30m_run_preomicron_daily.csv"), 
                        sep = "\t") %>% 
   mutate(hexid = as.character(hexid), 
          date = as.Date(date), 
@@ -65,7 +65,10 @@ for(i in -63:0){
     dev.off()
 }
 
-saveRDS(boundList_w1, file = here("data-products/wavefronts/boundaryData_firstWave.rds"), version = 2)
+## Watch out, this gonna be a over than 4.5GB file
+saveRDS(boundList_w1, 
+  file = here("Data/data-products/wavefronts/boundaryData_firstWave.rds"), 
+  version = 2)
 # boundList <- readRDS(here("data-products/wavefronts/boundaryData_firstWave.rds"))
 
 ###############################################################################
@@ -94,7 +97,7 @@ for (i in 2:length(boundList_w1)){
 }
 
 ### Save for future use ### 
-saveRDS(distanceToFrontier, here("data-products/wavefronts/distanceToFrontier_firstWave.rds"), version = 2)
+saveRDS(distanceToFrontier_w1, here("Data/data-products/wavefronts/distanceToFrontier_firstWave.rds"), version = 2)
 
 ### Read in the distance data ### 
 # distanceToFrontier <- readRDS(here("data-products/wavefronts/distanceToFrontier_firstWave.rds"))
@@ -149,7 +152,8 @@ for(i in -63:0){
   dev.off()
 }
 
-saveRDS(boundList_w2, file = here("data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
+## Watch out, this gonna be a over than 4.5GB file
+saveRDS(boundList_w2, file = here("Data/data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
 
 # boundList_w2 <- readRDS(here("data-products/wavefronts/boundaryData_secondWave.rds"))
 
@@ -174,7 +178,7 @@ for (i in 2:length(boundList_w2)){
 }
 
 ### Save for future use ### 
-saveRDS(distanceToFrontier_w2, here("data-products/wavefronts/distanceToFrontier_secondWave.rds"), version = 2)
+saveRDS(distanceToFrontier_w2, here("Data/data-products/wavefronts/distanceToFrontier_secondWave.rds"), version = 2)
 
 ###############################################################################
 ########### CALCULATE AND PLOT DISTANCE TO NEAREST POINT ######################
