@@ -149,7 +149,7 @@ for(i in -63:0){
   dev.off()
 }
 
-# saveRDS(boundList_w2, file = here("data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
+saveRDS(boundList_w2, file = here("data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
 
 # boundList_w2 <- readRDS(here("data-products/wavefronts/boundaryData_secondWave.rds"))
 
@@ -186,7 +186,7 @@ for(i in 1:63){
   date <- unique(distanceToFrontier_w2[[i]]$date)
   plotDistFront <-
     ggplot() + 
-    geom_sf(data=hexgrid %>% rename(geometry=x), mapping=aes(geometry= geometry), fill="grey80") +
+    geom_sf(data=hexgrid, mapping=aes(geometry= geometry), fill="grey80") +
     geom_sf(data=boundList_w2[[i]][["wave"]], mapping=aes(geometry= geometry), fill="grey50") +
     geom_sf(data=distanceToFrontier_w2[[i]], mapping=aes(geometry= geometry, 
                                                       color=distToFront/1000), size=1.5) +
@@ -198,7 +198,7 @@ for(i in 1:63){
     theme_bw() + 
     ggtitle(paste(date))
   
-  png(paste0(here("figures/wavefronts/secondWave/distFront-singleScale/plot", date, ".png")))
+  png(here(paste0("figures/wavefronts/secondWave/distFront-singleScale/plot", date, ".png")))
   print(plotDistFront)
   dev.off()
 }
