@@ -18,9 +18,7 @@ library(readr,    warn.conflicts = F)
 # reassign the result of this call in order to avoid a stale reference to the
 # unrepaired data (or at least I think that's what's going on.
 print("Loading county polygons then reprojecting")
-counties_raw <- topojson_read("Data/data-sources/county_polygons.topojson", 
-                              layer = "counties") %>%
-                st_make_valid()
+counties_raw <- st_read("Data/data-sources/cb_2018_us_county_500k/cb_2018_us_county_500k.shp")
 
 # missing geometries cause hexgrid() to fail below; check for NA and print
 # the number of counties removed.
@@ -30,7 +28,6 @@ if (dim(counties_raw)[1] > dim(counties_na)[1]) {
   print(paste(diff_dim, " county(ies) dropped due to missing geometry."))
 }
 
-st_crs(counties_na) <- 4326 # This TopoJSON doesn't encode the CRS maybe
 counties <- st_make_valid(counties_na)
 # remove counties with empty geometries 
 # this is necessary or st_make_grid fails below
@@ -44,10 +41,10 @@ excludes = c(
     "02", "60", "03", "81", "07", "64",
     "14", "66", "84", "86", "67", "89",
     "68", "71", "76", "69", "70", "95",
-    "43", "72", "74", "78", "79", "15"
-  )
+    "43", "72", "74", "78", "79", "15")
 
-counties <- filter(counties, !str_sub(id, 1, 2) %in% excludes)
+counties <- filter(counties, !str_sub(STATEFP, 1, 2) %in% excludes)
+counties_5070 <- st_transform(counties, 5070)
 
 ### Set the hexsize in kilometers 
 hexsize <- 1100
@@ -56,15 +53,13 @@ print("Creating hexgrid")
 
 ### transform the counties to a projection compatible with meter hexgrid 
 ### create a hexgrid using kilometers 
-countiesM <- st_transform(counties, 6933)
-
-hexgrid = st_make_grid(countiesM,
+hexgrid = st_make_grid(counties_5070,
                        square = F,
-                        units::as_units(hexsize, "km^2"))  %>%
+                       units::as_units(hexsize, "km^2"))  %>%
           st_as_sf %>%
           # Eliminate the hexes that don't intersect any counties.
           # I.e. the hexes in the Pacific Ocean etc (b/c Hawaii)
-          st_filter(countiesM, .predicate = st_intersects) %>%
+          st_filter(counties_5070, .predicate = st_intersects) %>%
           # Assign serial ID to each hex.
           mutate(hexid = as.character(1:n()))
 
