@@ -1,86 +1,54 @@
 gc()
 rm(list = ls())
-
+###############################################################################
+##### Load in the required packages                                       #####
+##############################################################################|
 library(tidyverse)
 library(sf)
 library(spdep)
 library(spatialreg)
 library(Matrix)
+library(INLA)
+library(foreach)
+library(doParallel)
+library(dplyr)
+library(tibble)
 
-## 
-hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
-  filter(as.integer(hexid) < 7662,
-         ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545) 
+###############################################################################
+##### Load in the required data files                                     #####
+##############################################################################|
+
+##### Hexgrid |
+hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |> 
+         filter(
+         # Taking out the isolated hex at Keywest
+         as.integer(hexid) != 6644)
 
 ## Hexgrid pop
 ## New hexgrid with Meta 30m population
-hexgrid_pop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
-  filter(as.integer(hexid) < 7662,
+hexgrid_pop <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp") |> 
+  filter(
          ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545) |> 
-  rename(population = metapop_30m) |> 
-  filter(population > 0)
+         as.integer(hexid) != 6644) |>
+  rename(population = meta_pop) %>%  
+  mutate(logpopulation = log(population))
+  # filter(population > 0) ## question for Rafa - why do we filter here?
 
-## Only keep hexes with a less than 10 cumulative infections per capita
-hexgrid_preomicron_cum <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |> 
-  # hexObservationsAllSF |>
-  st_drop_geometry() |>
-  mutate(hexid = as.character(hexid),
-         # ## This is wrong! Check back when we do infections allocation
-         # infections = case_when(infections >= population ~ population,
-         #                        population == 0 ~ 0,
-         #                        TRUE ~ infections)
-         ) |>
-  group_by(hexid) |> 
-  summarise(cum_infections = sum(infections, na.rm = T)) |> 
-  right_join(hexgrid_pop |>  
-               mutate(hexid = as.character(hexid)) |> 
-               select(hexid, population))  |> 
-  mutate(cum_infectionsPC = cum_infections/population) |> 
-  sf::st_as_sf() |> 
-  dplyr::mutate(logpopulation = log10(population),
-                cum_incidence = exp(log10(cum_infections) - logpopulation),
-                log_incidence = log10(cum_incidence+1))
+### Check for equal crs 
+st_crs(hexes) == st_crs(hexgrid_pop)
 
-## Filter for only the hexes we are keep to the analysis
-hexid_to_keep <- hexgrid_preomicron_cum |> 
-  filter(population > 0) |> 
-  filter(cum_infectionsPC<= 10)
-
-vroom::vroom_write(x = hexid_to_keep, file = "data-sources/hexid_to_keep.csv")
-write_sf(obj = hexid_to_keep,
-         dsn = "data-products/geo-hexes/hexid_to_keep.geojson",
-         delete_dsn = T,
-         delete_layer = T)
-
-## Hex population
-hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
-  filter(as.integer(hexid) < 7662,
-         ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545,
-         as.character(hexid) %in% as.character(hexid_to_keep$hexid)) |> 
-  rename(population = metapop_30m)
-
-## Certifying the correct number of unique hex; 7352
-length(unique(na.omit(hexpop$hexid)))
-
-hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
-  filter(as.integer(hexid) < 7662,
-         ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545,
-         as.character(hexid) %in% as.character(hexid_to_keep$hexid))
-
+###############################################################################
+##### Identify neighboring hexes                                          #####
+##############################################################################|
 ## Neighbors
 hexes_nb <- spdep::poly2nb(hexes, queen = TRUE, row.names = hexes$hexid)
-# hexes_nb2 <- st_touches(st_geometry(hexes))
 
 ## Check Plot
 # plot(st_geometry(hexes))
 # plot(hexes_nb, st_coordinates(st_centroid(hexes)), add=TRUE, col="blue")
 
-nb2INLA("data-products/hexes_adjmat.graph", nb = hexes_nb)
-hexes_graph <- INLA::inla.read.graph("data-products/hexes_adjmat.graph")
+nb2INLA("Data/data-products/hexes_adjmat.graph", nb = hexes_nb)
+hexes_graph <- INLA::inla.read.graph("Data/data-products/hexes_adjmat.graph")
 
 # wt_B <- nb2mat(neighbours = hexes_nb, style = "B", zero.policy = T)
 # wt_W <- nb2mat(neighbours = hexes_nb, style = "W", zero.policy = T)
@@ -92,32 +60,24 @@ hexes_graph <- INLA::inla.read.graph("data-products/hexes_adjmat.graph")
 # B <- as(listB, "CsparseMatrix")
 # W <- as(listW, "CsparseMatrix")
 
-## Population hexes
-hex_population <- sf::st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
-  filter(as.integer(hexid) < 7662,
-         ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545,
-         as.character(hexid) %in% as.character(hexid_to_keep$hexid)) |> 
-  rename(population = metapop_30m) |> 
-  mutate(logpopulation = log(population))
-
-## Certifying the correct number of unique hex; 7352
+## Certifying the correct number of unique hex; 7516
 length(unique(na.omit(hexes$hexid)))
 
 ## Pre-Omicron
-hexgrid_preomicron <- vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
+hexgrid_preomicron <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson") %>% 
+  # vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
-  select(-geometry) |>
-  mutate(infectionsPC = (infections/population)*1e5) |>
-  filter(as.integer(hexid) < 7662,
+  # select(-geometry) |>
+  # mutate(infectionsPC = (infections/population)*1e5) |>
+  filter(
          ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545,
-         hexid %in% hexid_to_keep$hexid) |> 
-  left_join(hexes, by = "hexid") |>
-  sf::st_as_sf()
+         as.integer(hexid) != 6644)
+         # hexid %in% hexid_to_keep$hexid) |> 
+  # left_join(hexes, by = "hexid") |>
+  # sf::st_as_sf()
 
-## Certifying the correct number of unique hex; 7352
+## Certifying the correct number of unique hex; 7516
 length(unique(na.omit(hexgrid_preomicron$hexid)))
 
 ## Function to push all dates to the end of the epidemiological week
@@ -132,7 +92,7 @@ length(unique(na.omit(hexgrid_preomicron$hexid)))
 #   mutate(weekdate = end.of.epiweek(date)) |> 
 #   group_by(weekdate, hexid) |> 
 #   summarise(infections = sum(infections, na.rm = T)) |> 
-#   left_join(hex_population |> 
+#   left_join(hexgrid_pop |> 
 #               st_drop_geometry() |> 
 #               select(hexid, population) |> 
 #               mutate(hexid = as.character(hexid))) |> 
@@ -142,11 +102,12 @@ length(unique(na.omit(hexgrid_preomicron$hexid)))
 #                    file = "data-products/geo-hexes/hexgrid_meta30m_week.csv")
 
 ## Pre-Omicron expanded dataset
+#### Ask Rafa to add an explanation of what is happening here 
 hex_spacetime <- expand.grid(hexid = as.character(unique(hexes$hexid)),
                              date = seq.Date(from = min(hexgrid_preomicron$date),
                                              to = max(hexgrid_preomicron$date), 
                                              by = "day")) |> 
-  left_join(hex_population |>
+  left_join(hexgrid_pop |>
               mutate(hexid = as.character(hexid)) |>
               st_drop_geometry()) |>
   left_join(hexgrid_preomicron |> 
@@ -164,7 +125,7 @@ hex_spacetime <- expand.grid(hexid = as.character(unique(hexes$hexid)),
          infectionsPC = (infections/population)*1e5,
          logpopulation = log10(population+1))
 
-## Certifying the correct number of unique hex; 7352
+## Certifying the correct number of unique hex; 7516
 length(unique(na.omit(hex_spacetime$hexid)))
 
 ## Returning the data.frame into a list format
@@ -193,7 +154,7 @@ is.rerun <- FALSE
 ## Yet another alternative is to set the prior parameterization to the model that can afford huge variance on the data ## Omicron dataset case. We can set the shape and rate parameters of log-Gamma prior to have mean = 1 and variance = 1.
 
 ## CAR INLA equivalent model
-library(INLA)
+
 compute_list <- control.compute(hyperpar = T, 
                                 return.marginals = T, 
                                 return.marginals.predictor = T,
@@ -204,11 +165,6 @@ compute_list <- control.compute(hyperpar = T,
                                 waic = T)
 
 predictor_list <- control.predictor(compute = T)
-
-library(foreach)
-library(doParallel)
-library(dplyr)
-library(tibble)
 
 # # Set up parallel backend
 # cl <- makeCluster(detectCores() - 2)
@@ -244,19 +200,20 @@ diag.eps = 1e-3
 
 weeks <- sort(unique(na.omit(hex_spacetime$date)))
 
-hex_graph <- inla.read.graph("data-products/hexes_adjmat.graph")
+hex_graph <- inla.read.graph("Data/data-products/hexes_adjmat.graph")
 
 # CAR_list <- foreach(i = 1:length(weeks),
 #                     .combine = c,
 #                     .multicombine = TRUE) %dopar% {
 
-CAR_df <- vroom::vroom("data-products/tsa_meta30m_run_preomicron_daily.csv")
+### WHAT IS THIS CSV AND HOW IS IT CREATED 
+CAR_df <- vroom::vroom("Data/data-products/tsa_meta30m_run_preomicron_daily.csv")
 
 CAR_list <- CAR_df |> 
   dplyr::group_split(date)
 
 ## Rerun flag, set this to TRUE is the dates to rerun are a lot to get better model estimates
-is.rerun <- TRUE
+# is.rerun <- TRUE
 
 ## setting the hexid column on the same class
 CAR_list <- lapply(CAR_list, function(x){x <- x |> mutate(hexid = as.integer(hexid))})
