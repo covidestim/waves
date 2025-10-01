@@ -11,8 +11,7 @@ library(Matrix)
 hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
   filter(as.integer(hexid) < 7662,
          ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545) |> 
-  st_transform(crs = 26915)
+         as.integer(hexid) != 6545) 
 
 ## Hexgrid pop
 ## New hexgrid with Meta 30m population
@@ -20,7 +19,6 @@ hexgrid_pop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_
   filter(as.integer(hexid) < 7662,
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6545) |> 
-  st_transform(crs = 26915) |>
   rename(population = metapop_30m) |> 
   filter(population > 0)
 
@@ -41,7 +39,6 @@ hexgrid_preomicron_cum <- vroom::vroom("data-products/geo-hexes/hexid-observatio
                select(hexid, population))  |> 
   mutate(cum_infectionsPC = cum_infections/population) |> 
   sf::st_as_sf() |> 
-  st_transform(crs = 26915)|>
   dplyr::mutate(logpopulation = log10(population),
                 cum_incidence = exp(log10(cum_infections) - logpopulation),
                 log_incidence = log10(cum_incidence+1))
@@ -63,7 +60,6 @@ hexpop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_popul
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6545,
          as.character(hexid) %in% as.character(hexid_to_keep$hexid)) |> 
-  st_transform(crs = 26915) |>
   rename(population = metapop_30m)
 
 ## Certifying the correct number of unique hex; 7352
@@ -73,8 +69,7 @@ hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |>
   filter(as.integer(hexid) < 7662,
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6545,
-         as.character(hexid) %in% as.character(hexid_to_keep$hexid)) |> 
-  st_transform(crs = 26915)
+         as.character(hexid) %in% as.character(hexid_to_keep$hexid))
 
 ## Neighbors
 hexes_nb <- spdep::poly2nb(hexes, queen = TRUE, row.names = hexes$hexid)
@@ -103,7 +98,6 @@ hex_population <- sf::st_read("data-products/geo-hexes/meta_population/hexgrid_m
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6545,
          as.character(hexid) %in% as.character(hexid_to_keep$hexid)) |> 
-  st_transform(crs = 26915) |>
   rename(population = metapop_30m) |> 
   mutate(logpopulation = log(population))
 
@@ -485,8 +479,7 @@ excludes = c(
 
 us_states <- tigris::states(cb = T) |> 
   dplyr::filter(!STATEFP %in% excludes) |> 
-  tigris::shift_geometry()|> 
-  st_transform(crs = 26915)
+  tigris::shift_geometry()
 
 i=325
 
@@ -497,8 +490,7 @@ hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |>
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6545) |> 
   mutate(hexid = as.character(1:n())) |> 
-  filter(hexid %in% as.character(unique(CAR_df$hexid))) |> 
-  st_transform(crs = 26915)
+  filter(hexid %in% as.character(unique(CAR_df$hexid))) 
 
 CAR_df_test <- CAR_df |> 
   mutate(hexid = as.character(hexid)) |> 
