@@ -1,3 +1,6 @@
+###############################################################################
+##### Load in the required packages                                       #####
+##############################################################################|
 suppressPackageStartupMessages( library(sf) )
 suppressPackageStartupMessages( library(geojsonio) )
 library(magrittr, warn.conflicts = F)
@@ -9,26 +12,31 @@ library(cli,      warn.conflicts = F)
 library(readr,    warn.conflicts = F)
 library(purrr,    warn.conflicts = F)
 library(progress, warn.conflicts = F)
+library(collapse)
 
-## Hexgrid
-hexgrid <- st_read("data-products/geo-hexes/hexes.geojson") |> 
-  filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
-  st_transform(crs = 26915)
+###############################################################################
+##### Load in the required data files                                     #####
+##############################################################################|
 
-## New hexgrid with Meta 30m population
-hexgrid_pop <- st_read("data-products/geo-hexes/meta_population/hexgrid_meta30m_population.geojson") |> 
-  filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
-  st_transform(crs = 26915) |>
-  rename(population = metapop_30m)
+##### Hexgrid |
+hexgrid <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |> 
+  # filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
+  st_transform(crs = 5070)
 
-## Observations
-observationsFips <- st_read("data-products/geo-hexes/observations_preomicron.shp") |> 
-  st_cast(to = "POLYGON")
+##### New hexgrid with Meta 30m population |
+hexgrid_pop <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp") |> 
+  # filter(as.integer(hexid) < 7662) |> ## Filtering out Puerto Rico hexes
+  st_transform(crs = 5070) |>
+  rename(population = meta_pop)
 
-#### Also set a test date for the plots throughout the workflow
+##### covidestim observations allocated across counties |
+##### this will be used to populate the hexgrid with infections |
+observationsFips <- st_read("data-products/geo-hexes/observations_preomicron.shp")
+
+##### Also set a test date for the plots throughout the workflow |
 testDate <- "2021-09-08"
 
-### Explore with a plot
+##### Explore with a plot |
 ggplot() +
   geom_sf(observationsFips |>
             filter(date == testDate),
@@ -50,14 +58,15 @@ ggplot() +
 
 ###############################################################################
 ###############################   Population    ###############################
-###############################################################################
+##############################################################################\
 
 ### Validate that the population and hexgrid are compatible 
-areal::ar_validate(hexgrid_pop, hexgrid, varList = "population", method = "aw", verbose = TRUE)
+areal::ar_validate(hexgrid_pop, hexgrid, varList = "population", 
+                   method = "aw", verbose = TRUE)
 
 ### Transform back to the projection of interest 
-hexgrid_popTrans <- st_transform(hexgrid_pop, crs = 4269)
-hexgrid_popTrans$hexid <- as.numeric(hexgrid_popTrans$hexid) ### used for filtering
+# hexgrid_popTrans <- st_transform(hexgrid_pop, crs = 4269)
+hexgrid$hexid <- as.numeric(hexgrid$hexid) ### used for filtering
 
 ### Plot the population across the hexes 
 # ggplot() + 
@@ -71,7 +80,7 @@ hexgrid_popTrans$hexid <- as.numeric(hexgrid_popTrans$hexid) ### used for filter
 
 ###############################################################################
 ###############################   Infections    ###############################
-###############################################################################
+##############################################################################|
 
 hexgrid_pop$interpolation_weight <- hexgrid_pop[["population"]]
 weight_column <- "interpolation_weight"
@@ -85,9 +94,9 @@ InfPopAll <- data.frame(hexid = 0,
                         date = NA)
 
 ## Checking if CRS are equal
-if(st_crs(hexgrid_pop) == st_crs(observationsFips)){
-  hexgrid_pop <- st_transform(hexgrid_pop, crs = 26915)
-  observationsFips <- st_transform(observationsFips, crs = 26915)
+if(st_crs(hexgrid_pop) != st_crs(observationsFips)){
+  hexgrid_pop <- st_transform(hexgrid_pop, crs = 5070)
+  observationsFips <- st_transform(observationsFips, crs = 5070)
 }
 
 ### Create an empty dataframe to hold the results
@@ -102,7 +111,7 @@ InfPopAll <- data.frame(hexid = 0,
 ### Write a loop for the allocation
 filtDate <- unique(na.omit(observationsFips$date))
 
-gc()
+# gc()
 
 ### Write a loop for the allocation
 for (i in filtDate){
@@ -120,12 +129,14 @@ for (i in filtDate){
   
   observationsFilt <- st_transform(observationsFilt, 
                                    # crs = 'ESRI:102009' ## Uncomment for ESRI CRS geometry
-                                   crs = 26915
+                                   # crs = 26915
+                                   crs = 5070
                                    )
   hexgrid_pop <- st_transform(hexgrid_pop |> 
                                     filter(!is.na(interpolation_weight)), 
                               # crs = 'ESRI:102009' ## Uncomment for ESRI CRS geometry
-                              crs = 26915
+                              # crs = 26915
+                              crs = 5070
                               )
   
   ## Creating denominators, it is the counties geometries with weight for each of them.
@@ -209,14 +220,15 @@ hexObservationsAll <- InfPopAll2  |>
 ### Create an SF version for plots 
 hexObservationsAllSF <- st_as_sf(hexObservationsAll)
 
-st_write(obj = hexObservationsAllSF,
-         paste0("data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson"),
-         delete_layer = T,
-         delete_dsn = T)
+##### Check for conservation of CRS and area during the allocation #####
+st_crs(hexObservationsAllSF) == st_crs(hexgrid)
+round(as.numeric(units::set_units(st_area(hexObservationsAllSF %>% 
+                                            filter(date == testDate) %>% 
+                                            st_union()),km^2))) == 
+round(as.numeric(units::set_units(st_area(hexgrid %>% st_union()),km^2)))
 
-# testDate <- unique(na.omit(observationsFips$date))[12]
-
-### Check if we have the same number of infections, our threshold here is if the loss is bigger than 10%
+### Check if we have the same number of infections, 
+### our threshold here is if the loss is bigger than 10%
 if(sum(observationsFips %>% 
        st_drop_geometry() %>% 
        filter(!is.na(infctns)) %>%
@@ -241,6 +253,7 @@ print(sum(hexObservationsAll %>%
                                       select(infctns)))
 
 ### Check with a plot 
+# st_crs(hexObservationsAllSF) == st_crs(observationsFips)
 ggplot() +
   geom_sf(hexObservationsAllSF %>% 
             filter(date == testDate, 
@@ -251,10 +264,18 @@ ggplot() +
             filter(date == testDate) |> 
             filter(infections == 0),
           mapping=aes(), fill="green") +
-  geom_sf(observationsFips %>% 
-            filter(date == testDate, 
-                   infctns == 0), 
-          mapping=aes(), color = "red")
+  geom_sf(observationsFips %>%
+            filter(date == testDate,
+                   infctns == 0),
+          mapping=aes(geometry = geometry), color = "red")
+
+###############################################################################
+###### Save an SF for plots 
+###############################################################################
+st_write(obj = hexObservationsAllSF,
+         paste0("data-products/geo-hexes/hexid-observations_preomicron_meta30m_09302025.geojson"),
+         delete_layer = T,
+         delete_dsn = T)
 
 ###############################################################################
 ###### Save to a CSV 
@@ -277,7 +298,7 @@ hexObservationsAllNoMissing <- hexObservationsAllNoMissing|>
 write_csv(hexObservationsAllNoMissing, 
           file = "data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv")
 
-
+hexgrid$hexid <-  as.character(hexgrid$hexid)
 hexObservationsAllNoMissingGeom <- full_join(hexObservationsAllNoMissing,
                                              hexgrid,
                                              by = "hexid")
@@ -286,7 +307,7 @@ hexObservationsAllNoMissingGeom <- hexObservationsAllNoMissingGeom |>
   select(-geometry.x) |> 
   rename(geometry = geometry.y) |> 
   st_as_sf() |> 
-  st_transform(crs = 4326) |> 
+  # st_transform(crs = 4326) |> 
   # st_transform(crs = 'ESRI:102009') |> 
   # st_transform(crs = 26915)
   mutate(date = as.Date(date))
@@ -296,36 +317,32 @@ st_write(obj = hexObservationsAllNoMissingGeom,
          delete_layer = T,
          delete_dsn = T)
 
-## HexObservations summarised for cumulative infections
+###############################################################################
+##### Create cumulative infections across the hexgrid                     #####
+###############################################################################
 
 hexObservationsAllSF <- sf::st_read("data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson")
 
-library(collapse)
 hexObservationsCum <- hexObservationsAllSF |> 
   collapse::fgroup_by(hexid) |> 
   collapse::fsummarise(cum_infections = collapse::fsum(infections),
                        geometry = sf::st_union(geometry)) ## st_union over each hexid, so it will produce again the hexes
 
-st_write(obj = hexObservationsCum,
-         paste0("data-products/geo-hexes/hexid-observations_preomicron_cumulative_meta30m.geojson"),
-         delete_layer = T,
-         delete_dsn = T)
-
 ## Plotting the cumulative
 color_option <- "inferno"
 
-crs <- 'ESRI:102009'
+crs <- 5070 #'ESRI:102009'
 ### Pre-Omicron
 ggplot() + 
   geom_sf(hexObservationsCum |> 
             # filter(cum_infectionsPC >0 & cum_infectionsPC <=10)|>
             st_transform(crs = crs), 
           mapping=aes(fill = log10(cum_infections+1))) +
-  geom_sf(us_states |> 
-            st_transform(crs = crs),
-          mapping=aes(),
-          color = "steelblue1",
-          fill = "transparent")+
+  # geom_sf(us_states |> 
+  #           st_transform(crs = crs),
+  #         mapping=aes(),
+  #         color = "steelblue1",
+  #         fill = "transparent")+
   # scale_fill_viridis_c(name = "Cumulative Infections/Population \n (March 2020 - December 2021)",
   #                      option = "inferno",
   #                      # direction = -1,
@@ -348,8 +365,20 @@ ggplot() +
         legend.key.width = grid::unit(3, "cm"),
         axis.text = element_text(size = 10))
 
+##### Check for conservation of CRS and area during the allocation #####
+st_crs(hexObservationsCum) == st_crs(hexgrid)
+round(as.numeric(units::set_units(st_area(hexObservationsCum %>% st_union()),km^2))) == 
+round(as.numeric(units::set_units(st_area(hexgrid %>% st_union()),km^2)))
+
+##### Save the cumulative infections #####
+st_write(obj = hexObservationsCum,
+         paste0("data-products/geo-hexes/hexid-observations_preomicron_cumulative_meta30m.geojson"),
+         delete_layer = T,
+         delete_dsn = T)
+
+###############################################################################
 ## Testing the map at Alpha peak date and 3 others, and Delta peak date and 3 others
-## peak date
+###############################################################################
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-08")
 
@@ -378,19 +407,3 @@ ggplot() +
                        option = "magma")+
   theme_minimal()+
   facet_wrap(.~date, nrow = 2)
-  # geom_sf(hexObservationsAllNoMissingGeom %>% filter(date == testDate,
-  #                                                    infectionsPC == 0),
-  #         mapping=aes(), fill="green")
-
-
-
-###############################################################################
-###### Save an SF for plots 
-###############################################################################
-# geojson_write(
-#   hexObservationsAllNoMissingGeom,
-#   geometry  = "polygon",
-#   file      = paste0("data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson"),
-#   crs = st_crs(hexObservationsAllNoMissingGeom),
-#   overwrite = T,
-# )
