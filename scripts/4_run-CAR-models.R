@@ -22,7 +22,12 @@ library(tibble)
 hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |> 
          filter(
          # Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6644)
+         as.integer(hexid) != 6644) %>%
+         # INLA requires the id to only be 1:N, where N is the total
+         # number of observations; because of this we need to rename the 
+         # hexids to be continuous. 
+         mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
+                               as.numeric(hexid) - 1))
 
 ## Hexgrid pop
 ## New hexgrid with Meta 30m population
@@ -30,7 +35,11 @@ hexgrid_pop <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.sh
   filter(## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6644) |>
   rename(population = meta_pop) %>%  
-  mutate(logpopulation = log(population)) 
+  mutate(logpopulation = log(population),
+         # INLA requires the id to only be 1:N, where N is the total
+         # number of observations; because of this we need to rename the 
+         # hexids to be continuous. 
+         hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), as.numeric(hexid) - 1))
 
 ### Check which hexes have population zero
 # ggplot() + geom_sf(data=hexgrid_pop) + 
@@ -45,7 +54,7 @@ st_crs(hexes) == st_crs(hexgrid_pop)
 ##### Identify neighboring hexes                                          #####
 ##############################################################################|
 ## Neighbors
-hexes_nb <- spdep::poly2nb(hexes, queen = TRUE, row.names = as.numeric(hexes$hexid))
+hexes_nb <- spdep::poly2nb(hexes, queen = TRUE, row.names = hexes$hexid)
 
 ## Check Plot
 # plot(st_geometry(hexes))
@@ -76,17 +85,19 @@ length(unique(na.omit(hexes$hexid)))
 
 ## Pre-Omicron 
 hexgrid_preomicron <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson") %>% 
-  # vroom::vroom("data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
+  # vroom::vroom("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
   # select(-geometry) |>
   # mutate(infectionsPC = (infections/population)*1e5) |>
   filter(
          ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6644)
-         # hexid %in% hexid_to_keep$hexid) |> 
-  # left_join(hexes, by = "hexid") |>
-  # sf::st_as_sf()
+         as.integer(hexid) != 6644) %>%
+  # INLA requires the id to only be 1:N, where N is the total
+  # number of observations; because of this we need to rename the 
+  # hexids to be continuous. 
+  mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
+                        as.numeric(hexid) - 1))
 
 ## Certifying the correct number of unique hex; 7516
 length(unique(na.omit(hexgrid_preomicron$hexid)))
@@ -94,21 +105,18 @@ length(unique(na.omit(hexgrid_preomicron$hexid)))
 ## Pre-Omicron expanded dataset
 ##### Reformat the data to give INLA a complete dataframe 
 ##### Gives full hexgrid and date for smoothing 
-hex_spacetime <- expand.grid(hexid = as.character(unique(hexes$hexid)),
+hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
                              date = seq.Date(from = min(hexgrid_preomicron$date),
                                              to = max(hexgrid_preomicron$date), 
                                              by = "day")) |> 
-  left_join(hexgrid_pop |>
-              mutate(hexid = as.character(hexid)) |>
-              st_drop_geometry()) |>
-  left_join(hexgrid_preomicron |> 
-              st_drop_geometry() |> 
-              # rename(date = weekdate) |> 
-              select(hexid, date, infections, infectionsPC)) |>  ## just join the desired columns, we have the geometry
-  # st_as_sf()|> 
-  mutate(Time = as.numeric(date - min(date)) + 1,
-         ID = as.numeric(hexid),
-         hexid = as.numeric(hexid))
+                  left_join(hexgrid_pop |>
+                              # mutate(hexid = as.character(hexid)) |>
+                              st_drop_geometry()) |>
+                  left_join(hexgrid_preomicron |> 
+                              st_drop_geometry() |> 
+                              # rename(date = weekdate) |> 
+                              select(hexid, date, infections, infectionsPC)) |>  
+                  mutate(Time = as.numeric(date - min(date)) + 1)
 
 ## Certifying the correct number of unique hex; 7516
 length(unique((hex_spacetime$hexid)))
@@ -208,10 +216,9 @@ if (is.rerun == TRUE){
   ### Reload the adjacency matrix
   hex_graph <- inla.read.graph("Data/data-products/hexes_adjmat.graph")
   ### Reload the initial results from the previous model run
-  CAR_df <- vroom::vroom("Data/data-products/tsa_meta30m_run_preomicron_daily.csv")
+  CAR_df <- vroom::vroom("Data/data-products/car_hexgrid1100km_run_preomicron_daily.csv")
   ### Reformating into a list as required by INLA
-  CAR_list <- CAR_df |> 
-    dplyr::group_split(date)
+  CAR_list <- CAR_df |> dplyr::group_split(date)
   ## setting the hexid column on the same class
   ## guarantee that all the hexids are integers
   CAR_list <- lapply(CAR_list, function(x){x <- x |> mutate(hexid = as.integer(hexid))})
@@ -271,6 +278,7 @@ if (is.rerun == TRUE){
     # geom_pointrange()+
     theme_minimal()
 } else if (is.rerun == FALSE){
+  
 ##### Create an empty list to keep model output
 
 CAR_list <- list()
@@ -288,118 +296,18 @@ test_dates <- c(c(alpha_peak-63,
                   delta_peak))
 } 
 
-###############################################################################
-## This fitting takes very long, it is process of prune fitting. 
-## Where it starts fitting something and narrows down to a best fit, 
-## which parameteres are defined at the while loop.
-### for test_dates is testing 
-### for full run it'll be length(weeks).
-# for (i in 1:length(test_dates)) {
-#   
-#   ## To clean unused variables here
-#   # gc()
-#   
-#   # if(is.na(dates_to_rerun[i]))next
-#   
-#   ### Assign the date for this loop run.
-#   current_date <- test_dates[i]
-#   hex_week <- hex_spacetime %>% 
-#     filter(date == current_date)
-#   
-#   best_model <- NULL
-#   counter <- 0
-#   sd_values <- c(0.0001, 0.03)  # Start with high value
-#   
-#   ## Parameters for the Hessian negative testing, to avoid INLA solver get stuck at negative eigenvalues
-#   # hess.min <- -1
-#   # h.value <- 0.01
-#   # h.trials <- 0.001
-#   # trials <- 0
-#   # while (hess.min <= 0 & trials < 50){
-#     
-#   while ((sd(sd_values)<0.0025 || sd(sd_values) > 0.010) & counter <= 10) {  # Flipped condition
-#     tryCatch({
-#       set.seed(.Random.seed)
-#       
-#       best_model <- inla(
-#         as.formula(infectionsPC ~ 1 + 
-#                      f(ID, 
-#                        model = "besag2",
-#                        graph = "data-products/hexes_adjmat.graph",
-#                        scale.model = TRUE,
-#                        diagonal = diag.eps,
-#                        constr = TRUE,
-#                        hyper = hyper_smooth)),
-#         data = as.data.frame(hex_week),
-#         family = "gaussian",
-#         control.inla = control.inla(strategy = "gaussian", int.strategy = "eb"),
-#         # control.inla = control.inla(strategy = "gaussian", h = h.value, int.strategy = "eb"),
-#         control.mode = control.mode(restart = TRUE),
-#         control.compute = compute_list,
-#         control.predictor = predictor_list,
-#         control.fixed = list(prec.intercept = 0.1),
-#         num.threads = 6,  # Prevent internal threading conflicts
-#         # verbose = T
-#       )
-#       
-#       sd_values <- best_model$summary.fitted.values$sd
-#       
-#     }, error = function(e) {
-#       set.seed(.Random.seed)
-#       
-#       best_model <- inla(
-#         as.formula(infectionsPC ~ 1 + 
-#                      f(ID, 
-#                        model = "besag2",
-#                        graph = hex_graph,
-#                        diagonal = diag.eps,
-#                        scale.model = TRUE,
-#                        constr = TRUE,
-#                        hyper = hyper_smooth)),
-#         data = as.data.frame(hex_week),
-#         family = "gaussian",
-#         control.inla = control.inla(strategy = "gaussian", int.strategy = "eb"),
-#         # control.inla = control.inla(strategy = "gaussian", h = h.value, int.strategy = "eb"),
-#         control.mode = control.mode(restart = TRUE),
-#         control.compute = compute_list,
-#         control.predictor = predictor_list,
-#         control.fixed = list(prec.intercept = 0.1),
-#         num.threads = 6,  # Prevent internal threading conflicts
-#         # verbose = T
-#       )
-#       sd_values <- best_model$summary.fitted.values$sd
-#     })
-#     
-#     counter <- counter + 1
-#     # hess.start <- which(best_model$logfile == 'Eigenvalues of the Hessian')
-#     # hess.min <- min(as.numeric(best_model$logfile[(hess.start+1):(hess.start+3)]))
-#     # h.value <- h.trials + 0.001
-#     # h.trials <- h.value
-#     # trials <- trials + 1
-#   }
-#   
-#   cat("Finished CAR model for week ", as.character(current_date),"! \n")
-#   
-#   CAR_list[[i]] <-
-#     # list(
-#     cbind(hex_week, 
-#           best_model$summary.fitted.values |> 
-#             rownames_to_column(var = "INLApred"))
-#   
-#   gc()
-#   rm(best_model, hex_week)
-#   # )
-# }
 cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
 
-weeks <- test_dates
+###############################################################################
+##### Run the model 
+##############################################################################|
 for (i in 1:length(weeks)) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
   # if(is.na(dates_to_rerun[i]))next
   
   current_date <- weeks[i]
-  cat("Starting model for date: ", as.character(current_date),"! \n")
+  cat("Starting model for date: ", as.character(current_date),"!\n")
   
   hex_week <- hex_spacetime %>% 
     filter(date == current_date)
@@ -421,7 +329,7 @@ for (i in 1:length(weeks)) {
       ### Call the BYM2 model with INLA
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
-                     f(ID, ### either need to update data above or id to hexid
+                     f(hexid, ### either need to update data above or id to hexid
                        model = "bym2",
                        graph = hexes_graph,
                        scale.model = TRUE, 
@@ -444,7 +352,7 @@ for (i in 1:length(weeks)) {
       
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
-                     f(ID, 
+                     f(hexid, 
                        model = "bym2",
                        graph = hexes_graph,
                        # diagonal = diag.eps,
@@ -465,7 +373,7 @@ for (i in 1:length(weeks)) {
     
     counter <- counter + 1
     # Update while condition
-    if(i>=2){
+    if(i >= 2){
       ## Create a vector of size 2 that will check for big drop in the median value for the sd
       vec_1 <- data.frame(
         upper_sd  = range(CAR_list[[i-1]]$sd)[2],
@@ -475,24 +383,27 @@ for (i in 1:length(weeks)) {
         upper_sd  = range(best_model$summary.fitted.values$sd)[2],
         median_sd = median(best_model$summary.fitted.values$sd))
       
-      vec_3 <- data.frame(
-        upper_sd  = range(CAR_list[[i+1]]$sd)[2],
-        median_sd = median(CAR_list[[i+1]]$sd))
+      ### We cannot check the "after" until we have the full dataset. 
+      ### We will revisit this after running one peak to see if necessary. 
       
-      vec <- rbind(vec_1, vec_2, vec_3)
+      # vec_3 <- data.frame(
+      #   upper_sd  = range(CAR_list[[i+1]]$sd)[2],
+      #   median_sd = median(CAR_list[[i+1]]$sd))
+      
+      vec <- rbind(vec_1, vec_2) #, vec_3)
       
       ### These check for "bad" runs for certain dates. If 
       ### either are true, rerun that date.  
       # Position 2 is the rerun position
       # 1) big drop in median vs. either neighbor
       drop_prev <- (vec$median_sd[1] - vec$median_sd[2]) > 3
-      drop_next <- (vec$median_sd[3] - vec$median_sd[2]) > 3
-      median_drop <- drop_prev || drop_next
+      # drop_next <- (vec$median_sd[3] - vec$median_sd[2]) > 3
+      median_drop <- drop_prev #|| drop_next
       
       # 2) big spike in upper vs. both neighbors
       spike_prev <- (vec$upper_sd[2] - vec$upper_sd[1]) > 3
-      spike_next <- (vec$upper_sd[2] - vec$upper_sd[3]) > 3
-      upper_spike <- spike_prev && spike_next
+      # spike_next <- (vec$upper_sd[2] - vec$upper_sd[3]) > 3
+      upper_spike <- spike_prev #&& spike_next
       
       while_condition <- median_drop || upper_spike
       
@@ -502,10 +413,9 @@ for (i in 1:length(weeks)) {
   
   cat("Finished CAR model for week ", as.character(current_date),"! \n")
   
-  CAR_list[[i]] <-
-    cbind(hex_week, 
-          best_model$summary.fitted.values |> 
-            rownames_to_column(var = "INLApred"))
+  CAR_list[[i]] <- cbind(hex_week, 
+                         best_model$summary.fitted.values |> 
+                         rownames_to_column(var = "INLApred"))
   ##### Clean up memory before next run
   rm(best_model, hex_week)
   gc()
@@ -522,18 +432,18 @@ CAR_df <- bind_rows(CAR_list)
 dataset <- "hexgrid1100km_run_preomicron_daily"
 
 vroom::vroom_write(x = CAR_df, 
-                   file = paste0("data-products/tsa_", 
+                   file = paste0("Data/data-products/car_", 
                                  dataset,
                                  ".csv"))
 
 ## Saving as list object
 save(list = CAR_list, 
-     file = "data-products/CAR_list_meta30m.RDS", 
+     file = "Data/data-products/car_list.RDS", 
      compress = "xz", 
      compression_level = 9)
 #
 ###############################################################################
-##### CHECK WHETHER THE MODEL FIT. #####
+##### CHECK WHETHER THE MODEL FIT with some plots #####
 ###############################################################################
 # fitted_values <- inla.tmarginal(exp, CAR_model$marginals.fitted.values)
 color_option <- "magma"
@@ -563,24 +473,12 @@ excludes = c(
 )
 
 us_states <- tigris::states(cb = T) |> 
-  dplyr::filter(!STATEFP %in% excludes) |> 
-  tigris::shift_geometry()
-
-i=325
-
-CAR_df <- vroom::vroom("data-products/tsa_meta30m_run_preomicron_daily.csv")
-
-hexes <- sf::st_read("data-products/geo-hexes/hexes.shp") |> 
-  filter(as.integer(hexid) < 7662,
-         ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6545) |> 
-  mutate(hexid = as.character(1:n())) |> 
-  filter(hexid %in% as.character(unique(CAR_df$hexid))) 
+  dplyr::filter(!STATEFP %in% excludes) #|> 
+  # tigris::shift_geometry()
 
 CAR_df_test <- CAR_df |> 
-  mutate(hexid = as.character(hexid)) |> 
   filter(date %in% test_dates) |> 
-  right_join(hexes) |> 
+  right_join(hexes) |>
   st_as_sf()
 
 ggplot() +
@@ -588,23 +486,8 @@ ggplot() +
             filter(!is.na(date)),
           aes(fill = mean))+
   scale_fill_viridis_c(option = color_option, name = "Estimated Infections/100k/day", direction = -1)+
-  # scale_fill_viridis_b(option = color_option, 
-  #                      name = "Estimated Infections/100k/day", 
-  #                      direction = -1,
-  #                      breaks = breaks_plt,
-  #                      labels = labels_plt,
-  #                      limits = limits_plt)+
   theme_minimal()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1, "in"))+
   facet_wrap(.~date, nrow = 2)
-# +
-  # guides(fill = guide_bins(title = "Infections per capita/100k",
-  #                          # labels = scales::label_math(expr = 10^., format = "force"),
-  #                          title.position = "top",
-  #                          title.vjust = 0.5))+
-  # labs(title = "InfectionsPC", subtitle = delta_peak)+
-  # labs(subtitle = paste0("CAR model with ", model," implementation and ", family, " likelihood"),
-       # caption = "*Proportional weights means weights ranging from 1 to 0")
-
