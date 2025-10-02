@@ -84,12 +84,9 @@ hexes_graph <- INLA::inla.read.graph("Data/data-products/hexes_adjmat.graph")
 length(unique(na.omit(hexes$hexid)))
 
 ## Pre-Omicron 
-hexgrid_preomicron <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.geojson") %>% 
-  # vroom::vroom("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
+hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
-  # select(-geometry) |>
-  # mutate(infectionsPC = (infections/population)*1e5) |>
   filter(
          ## Taking out the isolated hex at Keywest
          as.integer(hexid) != 6644) %>%
@@ -296,7 +293,7 @@ test_dates <- c(c(alpha_peak-63,
                   delta_peak))
 } 
 
-cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
+# cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
 
 ###############################################################################
 ##### Run the model 
@@ -304,8 +301,9 @@ cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
 for (i in 1:length(weeks)) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
-  # if(is.na(dates_to_rerun[i]))next
-  
+  if (is.rerun == TRUE){
+    if(is.na(dates_to_rerun[i]))next
+  }
   current_date <- weeks[i]
   cat("Starting model for date: ", as.character(current_date),"!\n")
   
