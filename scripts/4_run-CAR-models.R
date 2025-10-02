@@ -84,7 +84,7 @@ hexes_graph <- INLA::inla.read.graph("Data/data-products/hexes_adjmat.graph")
 length(unique(na.omit(hexes$hexid)))
 
 ## Pre-Omicron 
-hexgrid_preomicron <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson") %>% 
+hexgrid_preomicron <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.geojson") %>% 
   # vroom::vroom("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv") |>
   mutate(hexid = as.character(hexid),
          date = as.Date(date)) |>
