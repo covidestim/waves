@@ -273,7 +273,7 @@ ggplot() +
 ###### Save an SF for plots 
 ###############################################################################
 st_write(obj = hexObservationsAllSF,
-         paste0("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m_09302025.geojson"),
+         paste0("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.geojson"),
          delete_layer = T,
          delete_dsn = T)
 
@@ -285,7 +285,7 @@ hexObservationsAll$hexid <- as.character(hexObservationsAll$hexid)
 hexObservationsAll$infections <- as.numeric(hexObservationsAll$infections)
 
 write_csv(hexObservationsAll, 
-          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m_with_missing.csv")
+          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km_with_missing.csv")
 
 ### Remove missing values for infectionsPC 
 hexObservationsAllNoMissing <- hexObservationsAll %>% 
@@ -296,7 +296,7 @@ hexObservationsAllNoMissing <- hexObservationsAllNoMissing|>
   st_drop_geometry()
 
 write_csv(hexObservationsAllNoMissing, 
-          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.csv")
+          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv")
 
 hexgrid$hexid <-  as.character(hexgrid$hexid)
 hexObservationsAllNoMissingGeom <- full_join(hexObservationsAllNoMissing,
@@ -313,7 +313,7 @@ hexObservationsAllNoMissingGeom <- hexObservationsAllNoMissingGeom |>
   mutate(date = as.Date(date))
 
 st_write(obj = hexObservationsAllNoMissingGeom,
-         paste0("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m_nomissing.geojson"),
+         paste0("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km_nomissing.geojson"),
          delete_layer = T,
          delete_dsn = T)
 
@@ -321,7 +321,7 @@ st_write(obj = hexObservationsAllNoMissingGeom,
 ##### Create cumulative infections across the hexgrid                     #####
 ###############################################################################
 
-hexObservationsAllSF <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_meta30m.geojson")
+hexObservationsAllSF <- sf::st_read("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.geojson")
 
 hexObservationsCum <- hexObservationsAllSF |> 
   collapse::fgroup_by(hexid) |> 
@@ -372,7 +372,7 @@ round(as.numeric(units::set_units(st_area(hexgrid %>% st_union()),km^2)))
 
 ##### Save the cumulative infections #####
 st_write(obj = hexObservationsCum,
-         paste0("Data/data-products/geo-hexes/hexid-observations_preomicron_cumulative_meta30m.geojson"),
+         paste0("Data/data-products/geo-hexes/hexid-observations_preomicron_cumulative_hexgrid1100km.geojson"),
          delete_layer = T,
          delete_dsn = T)
 
