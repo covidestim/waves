@@ -285,7 +285,7 @@ hexObservationsAll$hexid <- as.character(hexObservationsAll$hexid)
 hexObservationsAll$infections <- as.numeric(hexObservationsAll$infections)
 
 write_csv(hexObservationsAll, 
-          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km_with_missing.csv")
+          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv")
 
 ### Remove missing values for infectionsPC 
 hexObservationsAllNoMissing <- hexObservationsAll %>% 
@@ -296,7 +296,7 @@ hexObservationsAllNoMissing <- hexObservationsAllNoMissing|>
   st_drop_geometry()
 
 write_csv(hexObservationsAllNoMissing, 
-          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv")
+          file = "Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km_nomissing.csv")
 
 hexgrid$hexid <-  as.character(hexgrid$hexid)
 hexObservationsAllNoMissingGeom <- full_join(hexObservationsAllNoMissing,
