@@ -113,7 +113,8 @@ hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
                               st_drop_geometry() |> 
                               # rename(date = weekdate) |> 
                               select(hexid, date, infections, infectionsPC)) |>  
-                  mutate(Time = as.numeric(date - min(date)) + 1)
+                  mutate(Time = as.numeric(date - min(date)) + 1, 
+                         infectionsPC = infectionsPC*1e5)
 
 ## Certifying the correct number of unique hex; 7516
 length(unique((hex_spacetime$hexid)))
@@ -294,11 +295,12 @@ test_dates <- c(c(alpha_peak-63,
 } 
 
 # cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
-
+# weeks <- test_dates
 ###############################################################################
 ##### Run the model 
 ##############################################################################|
 for (i in 1:length(weeks)) {
+# for (i in 1:4) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
   if (is.rerun == TRUE){
@@ -482,8 +484,10 @@ CAR_df_test <- CAR_df |>
 ggplot() +
   geom_sf(data = CAR_df_test |> 
             filter(!is.na(date)),
-          aes(fill = mean))+
-  scale_fill_viridis_c(option = color_option, name = "Estimated Infections/100k/day", direction = -1)+
+          aes(fill = mean), color = NA)+
+  scale_fill_viridis_c(option = color_option, 
+                       name = "Estimated Infections/100k/day", direction = -1)+
+  geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
   theme_minimal()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
