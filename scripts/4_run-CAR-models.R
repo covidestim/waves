@@ -195,12 +195,20 @@ diag.eps = 1e-3
 # # Export required objects
 # clusterExport(cl, c("hex_spacetime", "hyper_smooth", "hyper_smooth_bym2", "compute_list", "predictor_list"))
 
-# CAR_list <- foreach(i = 1:length(weeks),
+# CAR_list <- foreach(i = 1:length(days),
 #                     .combine = c,
 #                     .multicombine = TRUE) %dopar% {
 ###############################################################################
+##### Set which days to run the model for                                 #####
+##############################################################################|
+# days <- sort(unique(na.omit(hex_spacetime$date)))
 
-weeks <- sort(unique(na.omit(hex_spacetime$date)))
+##### Define the peaks of interest
+alpha_peak <- as.Date("2020-11-19")
+delta_peak <- as.Date("2021-09-04")
+
+days <- c(seq.Date(from = alpha_peak-63, to = alpha_peak, by = "day"),
+           seq.Date(from = delta_peak-63, to = delta_peak, by = "day"))
 
 ###############################################################################
 ##### Check if this is an initial run or a rerun.                         #####
@@ -227,14 +235,14 @@ if (is.rerun == TRUE){
   dates_to_rerun
   length(na.omit(dates_to_rerun))
   
-  sd_values <- data.frame(weeks = weeks, 
+  sd_values <- data.frame(days = days, 
                           sd = sapply(CAR_list, function(x){sd(x$sd)}),
                           upper = sapply(CAR_list, function(x){max(x$sd)}),
                           lower = sapply(CAR_list, function(x){sd(x$sd)})) |> 
     mutate(id = row_number())
   
   ggplot(data = sd_values, 
-         aes(x = weeks, y = sd, 
+         aes(x = days, y = sd, 
              label = id,
              # ymin = lower, ymax = upper,
              color = if_else(sd <= 0.01 & sd >= 0.0025, "firebrick", "steelblue"),
@@ -244,13 +252,13 @@ if (is.rerun == TRUE){
     theme_minimal()
   ## Alpha wave convergence analysis
   ## Alpha Peak Movie
-  j <- which(weeks == alpha_peak)
+  j <- which(days == alpha_peak)
   
   sd_values_alpha <- sd_values |> 
-    filter(weeks %in% weeks[seq(j-90,j+60, 2)])
+    filter(days %in% days[seq(j-90,j+60, 2)])
   
   ggplot(data = sd_values_alpha, 
-         aes(x = weeks, y = sd, 
+         aes(x = days, y = sd, 
              label = id,
              # ymin = lower, ymax = upper,
              color = if_else(sd <= 0.01 & sd >= 0.0025, "blue", "red"),
@@ -261,13 +269,13 @@ if (is.rerun == TRUE){
   
   ## Alpha wave convergence analysis
   ## Alpha Peak Movie
-  j <- which(weeks == delta_peak)
+  j <- which(days == delta_peak)
   
   sd_values_delta <- sd_values |> 
-    filter(weeks %in% weeks[seq(j-90,j+60, 2)])
+    filter(days %in% days[seq(j-90,j+60, 2)])
   
   ggplot(data = sd_values_delta, 
-         aes(x = weeks, y = sd, 
+         aes(x = days, y = sd, 
              label = id,
              # ymin = lower, ymax = upper,
              color = if_else(sd <= 0.01 & sd >= 0.0025, "blue", "red"),
@@ -281,9 +289,6 @@ if (is.rerun == TRUE){
 
 CAR_list <- list()
 
-alpha_peak <- as.Date("2020-11-19")
-delta_peak <- as.Date("2021-09-04")
-
 test_dates <- c(c(alpha_peak-63,
                   alpha_peak-45,
                   alpha_peak-24,
@@ -295,18 +300,19 @@ test_dates <- c(c(alpha_peak-63,
 } 
 
 # cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
-# weeks <- test_dates
+# days <- test_dates
+
 ###############################################################################
 ##### Run the model 
 ##############################################################################|
-for (i in 1:length(weeks)) {
+for (i in 1:length(days)) {
 # for (i in 1:4) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
   if (is.rerun == TRUE){
     if(is.na(dates_to_rerun[i]))next
   }
-  current_date <- weeks[i]
+  current_date <- days[i]
   cat("Starting model for date: ", as.character(current_date),"!\n")
   
   hex_week <- hex_spacetime %>% 
