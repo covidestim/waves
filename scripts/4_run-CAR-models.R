@@ -119,6 +119,14 @@ hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
 ## Certifying the correct number of unique hex; 7516
 length(unique((hex_spacetime$hexid)))
 
+###############################################################################
+##### Clean up environment before entering model setup and run            #####
+##############################################################################|
+rm(hexes)
+rm(hexgrid_preomicron)
+rm(hexgrid_pop)
+rm(hexes_nb)
+
 ## Returning the data.frame into a list format
 # CAR_list_rerun <- CAR_df_rerun |> 
 #   group_split(date) |> 
