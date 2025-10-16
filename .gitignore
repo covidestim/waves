@@ -126,6 +126,7 @@ Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv
 Data/data-products/geo-hexes/observations_preomicron.dbf
 Data/data-products/geo-hexes/observations_preomicron.shp
 Data/data-products/hex_spacetime.csv
+Data/data-products/hex_spacetimeTESTING.csv
 Data/data-products/hexid-observations_preomicron_meta30m.csv
 Data/data-products/tsa_meta30m_run_preomicron_daily.csv
 Data/data-products/tsa_preomicron.csv
