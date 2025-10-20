@@ -39,8 +39,21 @@ hexgrid_pop <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.sh
          # INLA requires the id to only be 1:N, where N is the total
          # number of observations; because of this we need to rename the 
          # hexids to be continuous. 
-         hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), as.numeric(hexid) - 1))
+         hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), as.numeric(hexid) - 1)) %>% 
+  filter(population != 0)
 
+# hexesFilt <- hexes %>% filter(hexid %in% hexgrid_pop$hexid)
+
+# hexgrid_pop_old <- st_read("~/Desktop/untitled folder 3/data-products/geo-hexes/meta_pop_new/hex_pop_meta_new.shp")#
+# 
+# 
+# ggplot(hexgrid_pop) + geom_sf(aes(fill=population)) + 
+#   scale_fill_viridis_c(option = color_option, limits = c(0,5*1e6),
+#                        name = "Population", direction = -1)
+#   
+# ggplot(hexgrid_pop_old) + geom_sf(aes(fill=meta_pop)) +
+#   scale_fill_viridis_c(option = color_option, limits = c(0,5*1e6),
+#                        name = "Population", direction = -1)
 ### Check which hexes have population zero
 # ggplot() + geom_sf(data=hexgrid_pop) + 
 #   geom_sf(data = hexgrid_pop %>% filter(population ==0), fill = "red")
@@ -183,6 +196,7 @@ hyper_smooth <- list(
 ### Strict smoothing prior ### 
 hyper_smooth_bym2 <- list(
   phi = list(prior = "pc", param = c(0.95, 0.5)),  # 50% prob ϕ > 0.95
+  # phi = list(prior = "logitbeta", param = c(0.69, 0.69)),  # 50% prob ϕ > 0.95
   prec = list(prior = "pc.prec", param = c(0.2, 0.01))
 )
 
@@ -252,11 +266,11 @@ if (is.rerun == TRUE){
   ggplot(data = sd_values, 
          aes(x = days, y = sd, 
              label = id,
-             # ymin = lower, ymax = upper,
+             ymin = lower, ymax = upper,
              color = if_else(sd <= 0.01 & sd >= 0.0025, "firebrick", "steelblue"),
          ))+
     geom_label()+
-    # geom_pointrange()+
+    geom_pointrange()+
     theme_minimal()
   ## Alpha wave convergence analysis
   ## Alpha Peak Movie
@@ -268,15 +282,15 @@ if (is.rerun == TRUE){
   ggplot(data = sd_values_alpha, 
          aes(x = days, y = sd, 
              label = id,
-             # ymin = lower, ymax = upper,
+             ymin = lower, ymax = upper,
              color = if_else(sd <= 0.01 & sd >= 0.0025, "blue", "red"),
          ))+
     geom_label()+
-    # geom_pointrange()+
+    geom_pointrange()+
     theme_minimal()
   
-  ## Alpha wave convergence analysis
-  ## Alpha Peak Movie
+  ## Delta wave convergence analysis
+  ## Delta Peak Movie
   j <- which(days == delta_peak)
   
   sd_values_delta <- sd_values |> 
@@ -344,7 +358,7 @@ for (i in 1:length(days)) {
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
                      f(hexid, ### either need to update data above or id to hexid
-                       model = "bym2",
+                       model = "bym2", 
                        graph = hexes_graph,
                        scale.model = TRUE, 
                        # diagonal = diag.eps,
@@ -431,7 +445,7 @@ for (i in 1:length(days)) {
                          best_model$summary.fitted.values |> 
                          rownames_to_column(var = "INLApred"))
   ##### Clean up memory before next run
-  rm(best_model, hex_week)
+  # rm(best_model, hex_week)
   gc()
 }
 
@@ -443,7 +457,7 @@ for (i in 1:length(days)) {
 CAR_df <- bind_rows(CAR_list)
 
 ## Saving the df, remember to change the name if the dataset is "preomicron" or "omicronera". The pattern nomenclature to files are tsa_preomicron.csv or tsa_omicronera.csv
-dataset <- "hexgrid1100km_run_preomicron_daily"
+dataset <- "hexgrid1100km_run_preomicron_daily_"
 
 vroom::vroom_write(x = CAR_df, 
                    file = paste0("Data/data-products/car_", 
@@ -451,27 +465,24 @@ vroom::vroom_write(x = CAR_df,
                                  ".csv"))
 
 ## Saving as list object
-save(list = CAR_list, 
-     file = "Data/data-products/car_list.RDS", 
-     compress = "xz", 
-     compression_level = 9)
-#
+saveRDS(CAR_list, 
+     file = "Data/data-products/car_list.RDS")
+# save(list = CAR_list, 
+#      file = "Data/data-products/car_list.RDS", 
+#      compress = "xz", 
+#      compression_level = 9)
+# CAR_list <- readRDS("Data/data-products/car_list_Wave1_testDates.RDS")
 ###############################################################################
 ##### CHECK WHETHER THE MODEL FIT with some plots #####
 ###############################################################################
 # fitted_values <- inla.tmarginal(exp, CAR_model$marginals.fitted.values)
-color_option <- "magma"
-na_color <- "grey70"
-## Breakdowns of each peaks
-breaks_plt <- c(0,seq(250,2500, 250))
-labels_plt <- c("250< ",seq(250,2250, 250), ' >2,500')
-limits_plt <- c(0,2500)
+
 
 ## Breakdowns of each peaks
-breaks_plt1 <- seq(0,500, 50)
-labels_plt1 <- c("<50",seq(50,450, 50), '>500')
-limits_plt1 <- c(0,500)
-color_option <- "magma"
+# breaks_plt1 <- seq(0,500, 50)
+# labels_plt1 <- c("<50",seq(50,450, 50), '>500')
+# limits_plt1 <- c(0,500)
+# color_option <- "magma"
 
 # CAR_model <- best_model
 family <- "gaussian"
@@ -490,20 +501,68 @@ us_states <- tigris::states(cb = T) |>
   dplyr::filter(!STATEFP %in% excludes) #|> 
   # tigris::shift_geometry()
 
+### Reload hexgrid 
+hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |> 
+  filter(
+    # Taking out the isolated hex at Keywest
+    as.integer(hexid) != 6644) %>%
+  # INLA requires the id to only be 1:N, where N is the total
+  # number of observations; because of this we need to rename the 
+  # hexids to be continuous. 
+  mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
+                        as.numeric(hexid) - 1))
+
+
 CAR_df_test <- CAR_df |> 
   filter(date %in% test_dates) |> 
   right_join(hexes) |>
   st_as_sf()
 
+color_option <- "magma"
+na_color <- "grey70"
+## Breakdowns of each peaks
+breaks_plt <- c(0,seq(25,275, 25))
+labels_plt <- c("25< ",seq(25,250, 25), ' >250')
+limits_plt <- c(0,300)
+
 ggplot() +
   geom_sf(data = CAR_df_test |> 
             filter(!is.na(date)),
           aes(fill = mean), color = NA)+
-  scale_fill_viridis_c(option = color_option, 
-                       name = "Estimated Infections/100k/day", direction = -1)+
+  scale_fill_viridis_b(option = color_option,
+                       # name = "Estimated Infections/1000/week",
+                       direction = -1,
+                       na.value = na_color,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  # scale_fill_viridis_c(option = color_option, 
+  #                      name = "Estimated Infections/100k/day", direction = -1)+
   geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
   theme_minimal()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1, "in"))+
   facet_wrap(.~date, nrow = 2)
+
+
+ggplot() +
+  geom_sf(data = CAR_df_test |> 
+            filter(date == alpha_peak),
+          aes(fill = mean), color = NA)+
+  # scale_fill_viridis_b(option = color_option,
+  #                      # name = "Estimated Infections/1000/week",
+  #                      direction = -1,
+  #                      na.value = na_color,
+  #                      breaks = breaks_plt,
+  #                      labels = labels_plt,
+  #                      limits = limits_plt,
+  # )+
+  scale_fill_viridis_c(option = color_option,
+                       name = "Estimated Infections/100k/day", direction = -1)+
+  geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
+  theme_minimal()+
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1, "in"))
