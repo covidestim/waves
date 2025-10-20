@@ -27,47 +27,61 @@ hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |>
          # number of observations; because of this we need to rename the 
          # hexids to be continuous. 
          mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
-                               as.numeric(hexid) - 1))
+                               as.numeric(hexid) - 1),
+                hexid = as.character(hexid))
 
-## Hexgrid pop
-## New hexgrid with Meta 30m population
-hexgrid_pop <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp") |> 
-  filter(## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6644) |>
-  rename(population = meta_pop) %>%  
-  mutate(logpopulation = log(population),
-         # INLA requires the id to only be 1:N, where N is the total
-         # number of observations; because of this we need to rename the 
-         # hexids to be continuous. 
-         hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), as.numeric(hexid) - 1)) %>% 
-  filter(population != 0)
+## Certifying the correct number of unique hex; 7516
+length(unique(na.omit(hexes$hexid)))
+##############################################################################|
+## Pre-Omicron infections allocated to hexgrid
+hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observations_preomicron_intersection_hexgrid1100km.csv") %>% 
+  mutate(date = as.Date(date)) |>
+  filter(
+         ## Taking out the isolated hex at Keywest
+         as.integer(hexid) != 6644) %>%
+  # INLA requires the id to only be 1:N, where N is the total
+  # number of observations; because of this we need to rename the 
+  # hexids to be continuous. 
+  mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
+                        as.numeric(hexid) - 1),
+         hexid = as.character(hexid)) %>% 
+  filter(population > 0) %>%
+  group_by(date) %>% 
+  mutate(id = 1:n())
 
-# hexesFilt <- hexes %>% filter(hexid %in% hexgrid_pop$hexid)
+## Certifying the correct number of unique hex; 7203
+length(unique(na.omit(hexgrid_preomicron$hexid)))
 
-# hexgrid_pop_old <- st_read("~/Desktop/untitled folder 3/data-products/geo-hexes/meta_pop_new/hex_pop_meta_new.shp")#
-# 
-# 
-# ggplot(hexgrid_pop) + geom_sf(aes(fill=population)) + 
-#   scale_fill_viridis_c(option = color_option, limits = c(0,5*1e6),
-#                        name = "Population", direction = -1)
-#   
-# ggplot(hexgrid_pop_old) + geom_sf(aes(fill=meta_pop)) +
-#   scale_fill_viridis_c(option = color_option, limits = c(0,5*1e6),
-#                        name = "Population", direction = -1)
-### Check which hexes have population zero
-# ggplot() + geom_sf(data=hexgrid_pop) + 
-#   geom_sf(data = hexgrid_pop %>% filter(population ==0), fill = "red")
+### Filter out hexagons with zero population from the hexgrid before 
+### next steps. 
+hexes <- hexes %>% 
+         filter(hexid %in% hexgrid_preomicron$hexid) %>% 
+         mutate(id=1:n())
 
-# hexgrid_pop <- hexgrid_pop %>% filter(population > 0)
+## Certifying the correct number of unique hex; 7203
+length(unique(na.omit(hexes$hexid)))
+##############################################################################|
+## Pre-Omicron expanded dataset
+##### Reformat the data to give INLA a complete dataframe 
+##### Gives full hexgrid and date for smoothing 
+hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
+                             date = seq.Date(from = min(hexgrid_preomicron$date),
+                                             to = max(hexgrid_preomicron$date), 
+                                             by = "day")) |> 
+                  left_join(hexgrid_preomicron |> 
+                              st_drop_geometry() |> 
+                              select(hexid, date, infections, infectionsPC,id)) |>  
+                  mutate(Time = as.numeric(date - min(date)) + 1, 
+                         infectionsPC = infectionsPC*1e5)
 
-### Check for equal crs 
-st_crs(hexes) == st_crs(hexgrid_pop)
+## Certifying the correct number of unique hex; 7203
+length(unique((hex_spacetime$hexid)))
 
 ###############################################################################
 ##### Identify neighboring hexes                                          #####
 ##############################################################################|
 ## Neighbors
-hexes_nb <- spdep::poly2nb(hexes, queen = TRUE, row.names = hexes$hexid)
+hexes_nb <- spdep::poly2nb(hexes, queen = TRUE, row.names = hexes$id)
 
 ## Check Plot
 # plot(st_geometry(hexes))
@@ -91,53 +105,13 @@ hexes_graph <- INLA::inla.read.graph("Data/data-products/hexes_adjmat.graph")
 # B <- as(listB, "CsparseMatrix")
 # W <- as(listW, "CsparseMatrix")
 ##############################################################################|
-##############################################################################|
 
-## Certifying the correct number of unique hex; 7516
-length(unique(na.omit(hexes$hexid)))
-
-## Pre-Omicron 
-hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv") |>
-  mutate(hexid = as.character(hexid),
-         date = as.Date(date)) |>
-  filter(
-         ## Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6644) %>%
-  # INLA requires the id to only be 1:N, where N is the total
-  # number of observations; because of this we need to rename the 
-  # hexids to be continuous. 
-  mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
-                        as.numeric(hexid) - 1))
-
-## Certifying the correct number of unique hex; 7516
-length(unique(na.omit(hexgrid_preomicron$hexid)))
-
-## Pre-Omicron expanded dataset
-##### Reformat the data to give INLA a complete dataframe 
-##### Gives full hexgrid and date for smoothing 
-hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
-                             date = seq.Date(from = min(hexgrid_preomicron$date),
-                                             to = max(hexgrid_preomicron$date), 
-                                             by = "day")) |> 
-                  left_join(hexgrid_pop |>
-                              # mutate(hexid = as.character(hexid)) |>
-                              st_drop_geometry()) |>
-                  left_join(hexgrid_preomicron |> 
-                              st_drop_geometry() |> 
-                              # rename(date = weekdate) |> 
-                              select(hexid, date, infections, infectionsPC)) |>  
-                  mutate(Time = as.numeric(date - min(date)) + 1, 
-                         infectionsPC = infectionsPC*1e5)
-
-## Certifying the correct number of unique hex; 7516
-length(unique((hex_spacetime$hexid)))
 
 ###############################################################################
 ##### Clean up environment before entering model setup and run            #####
 ##############################################################################|
 rm(hexes)
 rm(hexgrid_preomicron)
-rm(hexgrid_pop)
 rm(hexes_nb)
 
 ## Returning the data.frame into a list format
@@ -328,7 +302,7 @@ test_dates <- c(c(alpha_peak-63,
 ##### Run the model 
 ##############################################################################|
 for (i in 1:length(days)) {
-# for (i in 1:4) {
+# for (i in 2:4) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
   if (is.rerun == TRUE){
@@ -338,7 +312,7 @@ for (i in 1:length(days)) {
   cat("Starting model for date: ", as.character(current_date),"!\n")
   
   hex_week <- hex_spacetime %>% 
-    filter(date == current_date)
+              filter(date == current_date)
   
   #### Setup for the while loop 
   best_model <- NULL # holds the model fit
@@ -357,7 +331,7 @@ for (i in 1:length(days)) {
       ### Call the BYM2 model with INLA
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
-                     f(hexid, ### either need to update data above or id to hexid
+                     f(id, ### either need to update data above or id to hexid
                        model = "bym2", 
                        graph = hexes_graph,
                        scale.model = TRUE, 
@@ -380,7 +354,7 @@ for (i in 1:length(days)) {
       
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
-                     f(hexid, 
+                     f(id, 
                        model = "bym2",
                        graph = hexes_graph,
                        # diagonal = diag.eps,
