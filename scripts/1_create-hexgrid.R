@@ -86,3 +86,17 @@ round(as.numeric(units::set_units(st_area(hexgrid %>% st_union()),km^2))/1e6, 3)
 # Since we'll need the hexes for graphing later on, save them to a shapefile
 print("Writing hexgrid shapefile")
 st_write(hexgrid, paste0("Data/data-products/geo-hexes/hexgrid_", hexsize, "_km.shp"), append = F) # Forces overwrite
+
+###############################################################################
+### Create the intersection of counties and the hexgrid for population 
+### allocation. 
+###############################################################################
+
+intersections <- st_intersection(counties_5070, hexgrid) %>% 
+                 select(GEOID, hexid, geometry) %>% 
+                 rename(fips = GEOID) %>%
+                 filter(st_dimension(.) > 0) 
+
+ggplot() + geom_sf(data=intersections)
+
+st_write(intersections, here("Data/data-products/geo-hexes/intersectionPolygons.shp"))
