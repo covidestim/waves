@@ -24,17 +24,34 @@ hexgrid <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |>
   st_transform(crs = 5070)
 
 ##### Population allocated across the interesections of counties and hexes |
-population <- st_read(here("Data/data-products/geo-hexes/pop/interhex_pop.shp")) %>%
-  filter(date_x == as.Date("2020-11-19")) %>%
-  select(hexid_x, fips_x, sum_pop, geometry) %>% 
-  rename(population = sum_pop, 
+population <- st_read(here("Data/data-products/geo-hexes/pop/interhex_pop_updated.shp")) %>%
+  select(hexid_x, fips_x, sum_pop, geometry) %>%
+  rename(population = sum_pop,
          hexid = hexid_x,
          fips = fips_x)
 
+populationHex <- population %>% 
+                 st_drop_geometry() %>%
+                 reframe(population = sum(population, na.rm = TRUE), 
+                         .by="hexid")
+
+populationCnty <- population %>% 
+                  st_drop_geometry() %>%
+                  reframe(countyPop = sum(population, na.rm = TRUE), 
+                          .by = "fips")
+
+populationFull <- population %>% 
+                  full_join(populationCnty) %>%
+                  mutate(frcCountyPop = population/countyPop)
+
 ##### covidestim observations allocated across counties |
 ##### this will be used to populate the hexgrid with infections |
-observationsFips <- st_read("Data/data-products/observations_preomicron.shp")
+observationsFips <- st_read("Data/data-products/observations_preomicron.shp") %>% 
+                    st_drop_geometry() %>%
+                    filter(fips %in% unique(population$fips))
 
+observationsFips %>% 
+  filter(! fips %in% population$fips)
 ##### Also set a test date for the plots throughout the workflow |
 testDate <- "2021-03-26"
 
@@ -43,10 +60,10 @@ testDate <- "2021-03-26"
 #   geom_sf(observationsFips |>
 #             filter(date == testDate),
 #           mapping=aes(fill=infctPC)) +
-#   geom_sf(observationsFips %>% 
+#   geom_sf(observationsFips %>%
 #             filter(infctns == 0,
-#                    date == testDate), 
-#           mapping = aes(), 
+#                    date == testDate),
+#           mapping = aes(),
 #           fill="green")+
 #   theme_minimal() +
 #   scale_fill_viridis_c()
@@ -55,21 +72,66 @@ testDate <- "2021-03-26"
 ###############################################################################
 #######################  Allocate infections    ###############################
 ##############################################################################|
-hexInfections <- observationsFips %>%
-  st_drop_geometry() %>% 
-  left_join(population, by = "fips") %>%
-  group_by(fips, date) %>%
-  mutate(countyPop = sum(population, na.rm=TRUE), 
-         frcCountyPop = population/countyPop, 
-         intersectInfections = frcCountyPop * infctns) %>%
-  ungroup() %>% 
-  reframe(infections = sum(intersectInfections, na.rm=TRUE),
-          population = sum(population, na.rm=TRUE),
-          .by = c("date", "hexid")) %>% 
-  mutate(infectionsPC = infections / population)
+### 
+
+hexInfections <- data.frame()
+for (i in unique(observationsFips$date)){
+  print(as.Date(i))
+  hexInfections0 <- populationFull %>% 
+    st_drop_geometry() %>%
+    full_join(observationsFips %>% 
+                filter(date == as.Date(i)) %>% 
+                select(fips, date, infctns)) %>% 
+    mutate(intersectInfections = frcCountyPop * infctns) %>% 
+    reframe(infections = sum(intersectInfections, na.rm=TRUE), 
+            .by = "hexid") %>% 
+    mutate(date = as.Date(i)) %>%
+    left_join(populationHex) %>% 
+    mutate(infectionsPC = infections / population)
+    
+    #### CHECKS FOR PERFORMANCE #### 
+  
+    if (round(sum(hexInfections0$population)/1e6, 4) != 
+        round(sum(population$population)/1e6,4)){
+      print("Population does not match.")
+      break()
+    }
+  
+    if (round(sum(hexInfections0$infections),4) != 
+        round(observationsFips %>% filter (date == i) %>%
+        select(infctns) %>% sum(),4)){
+      print("Infections do not match")
+      break()
+    }
+  
+    if(nrow(hexInfections0) != nrow(populationHex)){
+      print("Number of hexes is incorrect")
+      break()
+    }
+  
+  #### Create one large dataframe
+  hexInfections <- rbind(hexInfections, hexInfections0)
+}
+
+# population %>% select(population) %>% st_drop_geometry() %>% sum()/1e6
+# populationFull %>% select(population) %>% st_drop_geometry() %>% sum()/1e6
+# hexInfections %>% filter(date ==alpha_peak) %>% select(population) %>% sum()/1e6
+# hexInfections %>% filter(date ==delta_peak) %>% select(population) %>% sum()/1e6
+# 
+# dim(hexInfections %>% filter(date ==alpha_peak))
+# dim(hexInfections %>% filter(date ==delta_peak))
+# dim(populationHex)
+hexInfections <- hexInfections %>% filter(! is.na(date))
 
 write_csv(hexInfections %>% st_drop_geometry(), 
           file = here("Data/data-products/geo-hexes/hexid-observations_preomicron_intersection_hexgrid1100km.csv"))
+
+ggplot() + 
+  # geom_sf(data = population)+
+  geom_sf(data=hexInfections %>% 
+            filter(date == alpha_peak,
+                   ! hexid %in% deltaHexID) %>%
+          left_join(hexgrid, by="hexid"))
 
 ##############################################################################|
 #### Check that things are working as expected ###############################
