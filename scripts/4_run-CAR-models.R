@@ -45,21 +45,36 @@ hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observati
   mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
                         as.numeric(hexid) - 1),
          hexid = as.character(hexid)) %>% 
-  filter(population > 0) %>%
-  group_by(date) %>% 
-  mutate(id = 1:n())
+  filter(population > 0) 
 
-## Certifying the correct number of unique hex; 7203
+# hexgrid_preomicronGEOM <- hexgrid_preomicron %>% filter(date==alpha_peak) %>% 
+#   left_join(hexes, by="hexid") 
+# 
+# ggplot() + geom_sf(data=hexgrid_preomicronGEOM, 
+#                    aes(geometry=geometry, fill=population))
+# 
+# alphaPeakPop <- hexgrid_preomicron %>% filter(date==alpha_peak) %>% 
+#                 select(population) 
+# 
+# deltaPeakPop <- hexgrid_preomicron %>% filter(date==delta_peak) %>% 
+#                 select(population) 
+# 
+# identical(alphaPeakPop, deltaPeakPop)
+# 
+# dim(alphaPeakPop)
+# dim(deltaPeakPop)
+
+## Certifying the correct number of unique hex; 7332
 length(unique(na.omit(hexgrid_preomicron$hexid)))
 
 ### Filter out hexagons with zero population from the hexgrid before 
 ### next steps. 
 hexes <- hexes %>% 
-         filter(hexid %in% hexgrid_preomicron$hexid) %>% 
-         mutate(id=1:n())
+         filter(hexid %in% hexgrid_preomicron$hexid) 
 
-## Certifying the correct number of unique hex; 7203
+## Certifying the correct number of unique hex; 7332
 length(unique(na.omit(hexes$hexid)))
+
 ##############################################################################|
 ## Pre-Omicron expanded dataset
 ##### Reformat the data to give INLA a complete dataframe 
@@ -70,11 +85,13 @@ hex_spacetime <- expand.grid(hexid = unique(hexes$hexid),
                                              by = "day")) |> 
                   left_join(hexgrid_preomicron |> 
                               st_drop_geometry() |> 
-                              select(hexid, date, infections, infectionsPC,id)) |>  
+                              select(hexid, date, infections, infectionsPC)) |>  
                   mutate(Time = as.numeric(date - min(date)) + 1, 
-                         infectionsPC = infectionsPC*1e5)
+                         infectionsPC = infectionsPC*1e5) %>% 
+                  group_by(date) %>% 
+                  mutate(id = 1:n())
 
-## Certifying the correct number of unique hex; 7203
+## Certifying the correct number of unique hex; 7332
 length(unique((hex_spacetime$hexid)))
 
 ###############################################################################
@@ -171,7 +188,9 @@ hyper_smooth <- list(
 hyper_smooth_bym2 <- list(
   phi = list(prior = "pc", param = c(0.95, 0.5)),  # 50% prob ϕ > 0.95
   # phi = list(prior = "logitbeta", param = c(0.69, 0.69)),  # 50% prob ϕ > 0.95
-  prec = list(prior = "pc.prec", param = c(0.2, 0.01))
+  prec = list(prior = "pc.prec", param = c(0.2, 0.01)#, 
+              # fixed=TRUE, initial=1e-8
+              )
 )
 
 diag.eps = 1e-3
@@ -284,6 +303,7 @@ if (is.rerun == TRUE){
 ##### Create an empty list to keep model output
 
 CAR_list <- list()
+CAR_diag_list <- list()
 
 test_dates <- c(c(alpha_peak-63,
                   alpha_peak-45,
@@ -296,13 +316,13 @@ test_dates <- c(c(alpha_peak-63,
 } 
 
 # cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
-# days <- test_dates
+# days <- test_dates[5:8]
 
 ###############################################################################
 ##### Run the model 
 ##############################################################################|
 for (i in 1:length(days)) {
-# for (i in 2:4) {
+# for (i in 5:8) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
   if (is.rerun == TRUE){
@@ -327,7 +347,9 @@ for (i in 1:length(days)) {
     ### sometimes a bad date can break the INLA model, this tryCatch
     ### is to avoid escaping the loop due to one date error. 
     tryCatch({
-      set.seed(.Random.seed) ## change the seed for reruns 
+      seed <- sample(1:1e6,1) #386860
+      set.seed(seed)
+      # set.seed(.Random.seed) ## change the seed for reruns 
       ### Call the BYM2 model with INLA
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
@@ -345,12 +367,14 @@ for (i in 1:length(days)) {
         control.compute = compute_list,
         control.predictor = predictor_list,
         # control.fixed = list(prec.intercept = 0.1),
-        num.threads = 2,  # Prevent internal threading conflicts (needs to be 1 for parallelized code)
+        num.threads = 1,  # Prevent internal threading conflicts (needs to be 1 for parallelized code)
         # verbose = T
       )
       
     }, error = function(e) {
-      set.seed(.Random.seed)
+      seed <- sample(1:1e6,1) #386860
+      set.seed(seed)
+      # set.seed(.Random.seed)
       
       best_model <- inla(
         as.formula(infectionsPC ~ 1 + 
@@ -368,7 +392,7 @@ for (i in 1:length(days)) {
         control.compute = compute_list,
         control.predictor = predictor_list,
         # control.fixed = list(prec.intercept = 0.1),
-        num.threads = 2,  # Prevent internal threading conflicts
+        num.threads = 1,  # Prevent internal threading conflicts
         # verbose = T
       )
     })
@@ -418,6 +442,9 @@ for (i in 1:length(days)) {
   CAR_list[[i]] <- cbind(hex_week, 
                          best_model$summary.fitted.values |> 
                          rownames_to_column(var = "INLApred"))
+  
+  CAR_diag_list[[i]] <- list(seed, 
+                             best_model$summary.hyperpar)
   ##### Clean up memory before next run
   # rm(best_model, hex_week)
   gc()
@@ -431,16 +458,16 @@ for (i in 1:length(days)) {
 CAR_df <- bind_rows(CAR_list)
 
 ## Saving the df, remember to change the name if the dataset is "preomicron" or "omicronera". The pattern nomenclature to files are tsa_preomicron.csv or tsa_omicronera.csv
-dataset <- "hexgrid1100km_run_preomicron_daily_"
-
-vroom::vroom_write(x = CAR_df, 
-                   file = paste0("Data/data-products/car_", 
-                                 dataset,
-                                 ".csv"))
-
-## Saving as list object
-saveRDS(CAR_list, 
-     file = "Data/data-products/car_list.RDS")
+# dataset <- "hexgrid1100km_run_preomicron_daily_"
+# 
+# vroom::vroom_write(x = CAR_df, 
+#                    file = paste0("Data/data-products/car_", 
+#                                  dataset,
+#                                  ".csv"))
+# 
+# ## Saving as list object
+# saveRDS(CAR_list, 
+#      file = "Data/data-products/car_list.RDS")
 # save(list = CAR_list, 
 #      file = "Data/data-products/car_list.RDS", 
 #      compress = "xz", 
@@ -459,21 +486,21 @@ saveRDS(CAR_list,
 # color_option <- "magma"
 
 # CAR_model <- best_model
-family <- "gaussian"
-model <- "besag2"
-
-## Figure2
-# Source: https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard_state_code
-excludes = c(
-  "02", "60", "03", "81", "07", "64",
-  "14", "66", "84", "86", "67", "89",
-  "68", "71", "76", "69", "70", "95",
-  "43", "72", "74", "78", "79", "15", "11"
-)
-
-us_states <- tigris::states(cb = T) |> 
-  dplyr::filter(!STATEFP %in% excludes) #|> 
-  # tigris::shift_geometry()
+# family <- "gaussian"
+# model <- "besag2"
+# 
+# ## Figure2
+# # Source: https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard_state_code
+# excludes = c(
+#   "02", "60", "03", "81", "07", "64",
+#   "14", "66", "84", "86", "67", "89",
+#   "68", "71", "76", "69", "70", "95",
+#   "43", "72", "74", "78", "79", "15", "11"
+# )
+# 
+# us_states <- tigris::states(cb = T) |> 
+#   dplyr::filter(!STATEFP %in% excludes) #|> 
+#   # tigris::shift_geometry()
 
 ### Reload hexgrid 
 hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |> 
@@ -484,11 +511,12 @@ hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |>
   # number of observations; because of this we need to rename the 
   # hexids to be continuous. 
   mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
-                        as.numeric(hexid) - 1))
+                        as.numeric(hexid) - 1), 
+         hexid = as.character(hexid))
 
 
 CAR_df_test <- CAR_df |> 
-  filter(date %in% test_dates) |> 
+  filter(date %in% test_dates[5:8]) |> 
   right_join(hexes) |>
   st_as_sf()
 
