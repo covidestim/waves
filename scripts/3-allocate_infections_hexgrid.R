@@ -49,6 +49,15 @@ populationHex <- population %>%
 #              dsn = "Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp",
 #              driver = 'ESRI Shapefile')
 
+## US Counties shapes
+# countyGeom <- tigris::counties() |> st_transform(crs = 5070) |> rename(fips = GEOID) |> select(fips)
+
+# sf::st_write(
+#   obj = countyGeom, 
+#   dsn = "Data/data-sources/countyPolygons.shp", 
+#   delete_dsn = T, delete_layer = T,
+#   driver = 'ESRI Shapefile')
+
 countyGeom <- st_read(here("Data/data-sources/countyPolygons.shp")) %>% 
               filter(fips %in% population$fips)
 
@@ -121,7 +130,25 @@ for (i in unique(observationsFips$date)){
                          left_join(populationFull %>% 
                                      select(hexid, geometry))
   
-    ggplot() + geom_sf(data=hexInfectionsGeom, aes(geometry = geometry, fill=infections))
+    # ggplot() + 
+    #   geom_sf(data=hexInfectionsGeom |> 
+    #     filter(infectionsPC > 0), 
+    #   aes(geometry = geometry, 
+    #     fill=infectionsPC*1e5))+
+    #   geom_sf(data=hexInfectionsGeom |> 
+    #     filter(is.na(infectionsPC)), 
+    #   aes(geometry = geometry),
+    # fill = "orange")+
+    #   geom_sf(data = hexInfectionsGeom |> 
+    #     filter(infections == 0, infectionsPC == 0), 
+    #   aes(geometry=geometry), fill = "deeppink1")+
+    #   geom_sf(data = hexInfectionsGeom |> 
+    #     filter(infections == 0, is.na(infectionsPC)), 
+    #   aes(geometry=geometry), fill = "green")
+      # geom_sf(data = hexInfectionsGeom |> 
+      #   filter(infectionsPC == 0), 
+      # aes(geometry=geometry), fill = "green")
+      
     
     #### CHECKS FOR PERFORMANCE #### 
   
@@ -162,10 +189,10 @@ for (i in unique(observationsFips$date)){
 hexInfections <- hexInfections %>% filter(! is.na(date))
 
 ## Separating no infections allocated due to no poplations from no infections allocated due to no data on infections
-hexInfections <- hexInfections |> 
-  mutate(infectionsPC = case_when(population == 0 ~ 0,
-                                  population !=0 & infectionsPC == 0 ~ NA,
-                                  TRUE~infectionsPC))
+# hexInfections <- hexInfections |> 
+#   mutate(infectionsPC = case_when(population == 0 ~ 0,
+#                                   population !=0 & infectionsPC == 0 ~ NA,
+#                                   TRUE~infectionsPC))
 
 write_csv(hexInfections %>% st_drop_geometry(), 
           file = here("Data/data-products/geo-hexes/hexid-observations_preomicron_intersection_hexgrid1100km.csv"))
