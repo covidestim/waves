@@ -1,3 +1,5 @@
+gc()
+rm(list = ls())
 ###############################################################################
 ##### Load in the required packages                                       #####
 ##############################################################################|
@@ -31,9 +33,21 @@ population <- st_read(here("Data/data-products/geo-hexes/pop/interhex_pop_update
          fips = fips_x)
 
 populationHex <- population %>% 
-                 st_drop_geometry() %>%
-                 reframe(population = sum(population, na.rm = TRUE), 
-                         .by="hexid")
+  st_drop_geometry() %>%
+  reframe(population = sum(population, na.rm = TRUE), 
+          .by="hexid")
+
+# vroom::vroom_write(x = populationHex, file = "Data/data-products/geo-hexes/pop/hexgrid_1100_km_meta_pop.csv")
+
+# populationHex <- population %>% 
+#                  st_drop_geometry() %>%
+#                  reframe(population = sum(population, na.rm = TRUE), 
+#                          .by="hexid") |> 
+#   right_join(hexes)
+
+# sf::st_write(obj = populationHex, 
+#              dsn = "Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp",
+#              driver = 'ESRI Shapefile')
 
 populationCnty <- population %>% 
                   st_drop_geometry() %>%
@@ -47,26 +61,27 @@ populationFull <- population %>%
 ##### covidestim observations allocated across counties |
 ##### this will be used to populate the hexgrid with infections |
 observationsFips <- st_read("Data/data-products/observations_preomicron.shp") %>% 
-                    st_drop_geometry() %>%
+                    # st_drop_geometry() %>%
                     filter(fips %in% unique(population$fips))
 
 observationsFips %>% 
   filter(! fips %in% population$fips)
+
 ##### Also set a test date for the plots throughout the workflow |
 testDate <- "2021-03-26"
 
 ##### Explore with a plot |
-# ggplot() +
-#   geom_sf(observationsFips |>
-#             filter(date == testDate),
-#           mapping=aes(fill=infctPC)) +
-#   geom_sf(observationsFips %>%
-#             filter(infctns == 0,
-#                    date == testDate),
-#           mapping = aes(),
-#           fill="green")+
-#   theme_minimal() +
-#   scale_fill_viridis_c()
+ggplot() +
+  geom_sf(observationsFips |>
+            filter(date == testDate),
+          mapping=aes(fill=infctPC)) +
+  geom_sf(observationsFips %>%
+            filter(infctns == 0,
+                   date == testDate),
+          mapping = aes(),
+          fill="green")+
+  theme_minimal() +
+  scale_fill_viridis_c()
 
 
 ###############################################################################
@@ -77,6 +92,7 @@ testDate <- "2021-03-26"
 hexInfections <- data.frame()
 for (i in unique(observationsFips$date)){
   print(as.Date(i))
+  
   hexInfections0 <- populationFull %>% 
     st_drop_geometry() %>%
     full_join(observationsFips %>% 
@@ -86,20 +102,24 @@ for (i in unique(observationsFips$date)){
     reframe(infections = sum(intersectInfections, na.rm=TRUE), 
             .by = "hexid") %>% 
     mutate(date = as.Date(i)) %>%
-    left_join(populationHex) %>% 
+    left_join(populationHex |> filter(population != 0)) %>% 
     mutate(infectionsPC = infections / population)
     
     #### CHECKS FOR PERFORMANCE #### 
   
-    if (round(sum(hexInfections0$population)/1e6, 4) != 
-        round(sum(population$population)/1e6,4)){
+    if (round(sum(hexInfections0$population, na.rm = T)/1e6, 4) != 
+        round(sum(population$population, na.rm = T)/1e6,4)){
       print("Population does not match.")
       break()
     }
   
-    if (round(sum(hexInfections0$infections),4) != 
-        round(observationsFips %>% filter (date == i) %>%
-        select(infctns) %>% sum(),4)){
+    if (round(sum(hexInfections0$infections, na.rm = T),
+              4) != 
+        round(observationsFips %>% 
+              filter(date == as.Date(i)) %>%
+              pull(var = infctns) %>% 
+              sum(na.rm = T),
+              4)){
       print("Infections do not match")
       break()
     }
@@ -122,6 +142,11 @@ for (i in unique(observationsFips$date)){
 # dim(hexInfections %>% filter(date ==delta_peak))
 # dim(populationHex)
 hexInfections <- hexInfections %>% filter(! is.na(date))
+
+hexInfections <- hexInfections |> 
+  mutate(infectionsPC = case_when(population == 0 ~ 0,
+                                  population !=0 & infectionsPC == 0 ~ NA,
+                                  TRUE~infectionsPC))
 
 write_csv(hexInfections %>% st_drop_geometry(), 
           file = here("Data/data-products/geo-hexes/hexid-observations_preomicron_intersection_hexgrid1100km.csv"))
