@@ -143,6 +143,7 @@ for (i in unique(observationsFips$date)){
 # dim(populationHex)
 hexInfections <- hexInfections %>% filter(! is.na(date))
 
+## Separating no infections allocated due to no poplations from no infections allocated due to no data on infections
 hexInfections <- hexInfections |> 
   mutate(infectionsPC = case_when(population == 0 ~ 0,
                                   population !=0 & infectionsPC == 0 ~ NA,
