@@ -49,6 +49,9 @@ populationHex <- population %>%
 #              dsn = "Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp",
 #              driver = 'ESRI Shapefile')
 
+countyGeom <- st_read(here("Data/data-sources/countyPolygons.shp")) %>% 
+              filter(fips %in% population$fips)
+
 populationCnty <- population %>% 
                   st_drop_geometry() %>%
                   reframe(countyPop = sum(population, na.rm = TRUE), 
@@ -64,46 +67,61 @@ observationsFips <- st_read("Data/data-products/observations_preomicron.shp") %>
                     # st_drop_geometry() %>%
                     filter(fips %in% unique(population$fips))
 
-observationsFips %>% 
-  filter(! fips %in% population$fips)
+# observationsFips %>% 
+#   filter(! fips %in% population$fips)
 
 ##### Also set a test date for the plots throughout the workflow |
 testDate <- "2021-03-26"
 
 ##### Explore with a plot |
-ggplot() +
-  geom_sf(observationsFips |>
-            filter(date == testDate),
-          mapping=aes(fill=infctPC)) +
-  geom_sf(observationsFips %>%
-            filter(infctns == 0,
-                   date == testDate),
-          mapping = aes(),
-          fill="green")+
-  theme_minimal() +
-  scale_fill_viridis_c()
+# ggplot() +
+#   geom_sf(observationsFips |>
+#             filter(date == testDate),
+#           mapping=aes(fill=infctPC)) +
+#   geom_sf(observationsFips %>%
+#             filter(infctns == 0,
+#                    date == testDate),
+#           mapping = aes(),
+#           fill="green")+
+#   theme_minimal() +
+#   scale_fill_viridis_c()
 
 
 ###############################################################################
 #######################  Allocate infections    ###############################
 ##############################################################################|
 ### 
+### Helper function that returns NA if all are NA but sums non NA values 
+### otherwise
+sumna <- function(x) {
+  if(all(is.na(x))) NA else sum(x, na.rm = TRUE)
+}
 
 hexInfections <- data.frame()
 for (i in unique(observationsFips$date)){
   print(as.Date(i))
   
+  observationsFullCnty <- observationsFips %>% 
+                          filter(date == as.Date(i)) %>% 
+                          select(fips, date, infctns) %>% 
+                          full_join(countyGeom %>% st_drop_geometry())
+  
   hexInfections0 <- populationFull %>% 
     st_drop_geometry() %>%
-    full_join(observationsFips %>% 
-                filter(date == as.Date(i)) %>% 
-                select(fips, date, infctns)) %>% 
+    full_join(observationsFullCnty) %>%
     mutate(intersectInfections = frcCountyPop * infctns) %>% 
-    reframe(infections = sum(intersectInfections, na.rm=TRUE), 
+    reframe(infections = sumna(intersectInfections), 
             .by = "hexid") %>% 
     mutate(date = as.Date(i)) %>%
     left_join(populationHex |> filter(population != 0)) %>% 
     mutate(infectionsPC = infections / population)
+  
+    #### CHECK WITH A PLOT ####
+    hexInfectionsGeom <- hexInfections0 %>% 
+                         left_join(populationFull %>% 
+                                     select(hexid, geometry))
+  
+    ggplot() + geom_sf(data=hexInfectionsGeom, aes(geometry = geometry, fill=infections))
     
     #### CHECKS FOR PERFORMANCE #### 
   
@@ -152,13 +170,6 @@ hexInfections <- hexInfections |>
 write_csv(hexInfections %>% st_drop_geometry(), 
           file = here("Data/data-products/geo-hexes/hexid-observations_preomicron_intersection_hexgrid1100km.csv"))
 
-ggplot() + 
-  # geom_sf(data = population)+
-  geom_sf(data=hexInfections %>% 
-            filter(date == alpha_peak,
-                   ! hexid %in% deltaHexID) %>%
-          left_join(hexgrid, by="hexid"))
-
 ##############################################################################|
 #### Check that things are working as expected ###############################
 ##############################################################################|
@@ -187,11 +198,11 @@ ggplot() +
 hexInfections %>% filter(date == testDate) %>%
   st_drop_geometry() %>% 
   ungroup() %>%
-  select(hexInfections) %>% sum(na.rm=TRUE)
+  select(infections) %>% sum(na.rm=TRUE)
 
-observationFips %>% filter(date == testDate) %>%
+observationsFips %>% filter(date == testDate) %>%
   st_drop_geometry() %>% 
-  select(infections) %>% sum()
+  select(infctns) %>% sum()
 
 ######## CHECK TOTAL POPULATION #####################################|
 hexInfections %>% filter(date == testDate) %>%
