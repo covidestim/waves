@@ -45,13 +45,13 @@ hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observati
   mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
                         as.numeric(hexid) - 1),
          hexid = as.character(hexid)) %>% 
-  filter(population > 0) 
+  filter(populationTotal > 0) 
 
-# hexgrid_preomicronGEOM <- hexgrid_preomicron %>% filter(date==alpha_peak) %>% 
-#   left_join(hexes, by="hexid") 
+# hexgrid_preomicronGEOM <- hexgrid_preomicron %>% filter(date==delta_peak) %>%
+#                           left_join(hexes, by="hexid")
 # 
-# ggplot() + geom_sf(data=hexgrid_preomicronGEOM, 
-#                    aes(geometry=geometry, fill=population))
+# ggplot() + geom_sf(data=hexgrid_preomicronGEOM %>% filter(infectionsPC > 0),
+#                    aes(geometry=geometry, fill=infectionsPC))
 # 
 # alphaPeakPop <- hexgrid_preomicron %>% filter(date==alpha_peak) %>% 
 #                 select(population) 
@@ -186,10 +186,12 @@ hyper_smooth <- list(
 ### Priors for BYM2 model ###
 ### Strict smoothing prior ### 
 hyper_smooth_bym2 <- list(
-  phi = list(prior = "pc", param = c(0.95, 0.5)),  # 50% prob ϕ > 0.95
+  phi = list(prior = "pc", param = c(0.95, 0.5)),
+             # fixed = TRUE, initial = 0.9920027),
+             # fixed=TRUE, initial = (9.822112e-01)*.90),  # 50% prob ϕ > 0.95
   # phi = list(prior = "logitbeta", param = c(0.69, 0.69)),  # 50% prob ϕ > 0.95
-  prec = list(prior = "pc.prec", param = c(0.2, 0.01)#, 
-              # fixed=TRUE, initial=1e-8
+  prec = list(prior = "pc.prec", param = c(0.2, 0.01) 
+              # fixed=TRUE, initial=(6.825076e-03)*.90
               )
 )
 
@@ -222,8 +224,8 @@ diag.eps = 1e-3
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-04")
 
-days <- c(seq.Date(from = alpha_peak-63, to = alpha_peak, by = "day"),
-           seq.Date(from = delta_peak-63, to = delta_peak, by = "day"))
+days <- c(seq.Date(from = alpha_peak-63, to = alpha_peak, by = "day"))#,
+           # seq.Date(from = delta_peak-63, to = delta_peak, by = "day"))
 
 ###############################################################################
 ##### Check if this is an initial run or a rerun.                         #####
@@ -316,7 +318,7 @@ test_dates <- c(c(alpha_peak-63,
 } 
 
 # cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
-# days <- test_dates[5:8]
+# days <- test_dates[8]
 
 ###############################################################################
 ##### Run the model 
@@ -455,24 +457,25 @@ for (i in 1:length(days)) {
 # stopCluster(cl)
 
 ## Turning into a df
+## last good day 2020-10-13
 CAR_df <- bind_rows(CAR_list)
 
 ## Saving the df, remember to change the name if the dataset is "preomicron" or "omicronera". The pattern nomenclature to files are tsa_preomicron.csv or tsa_omicronera.csv
-# dataset <- "hexgrid1100km_run_preomicron_daily_"
-# 
-# vroom::vroom_write(x = CAR_df, 
-#                    file = paste0("Data/data-products/car_", 
+# dataset <- "hexgrid1100km_run_preomicron_daily_wave1"
+
+# vroom::vroom_write(x = CAR_df,
+#                    file = paste0("Data/data-products/car_",
 #                                  dataset,
 #                                  ".csv"))
 # 
 # ## Saving as list object
-# saveRDS(CAR_list, 
-#      file = "Data/data-products/car_list.RDS")
+# saveRDS(CAR_list,
+#      file = "Data/data-products/car_list_wave1.RDS")
 # save(list = CAR_list, 
 #      file = "Data/data-products/car_list.RDS", 
 #      compress = "xz", 
 #      compression_level = 9)
-# CAR_list <- readRDS("Data/data-products/car_list_Wave1_testDates.RDS")
+# CAR_list <- readRDS("Data/data-products/car_list_Wave1.RDS")
 ###############################################################################
 ##### CHECK WHETHER THE MODEL FIT with some plots #####
 ###############################################################################
@@ -516,7 +519,7 @@ hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |>
 
 
 CAR_df_test <- CAR_df |> 
-  filter(date %in% test_dates[5:8]) |> 
+  # filter(date %in% test_dates) |> 
   right_join(hexes) |>
   st_as_sf()
 
@@ -546,7 +549,7 @@ ggplot() +
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1, "in"))+
-  facet_wrap(.~date, nrow = 2)
+  facet_wrap(.~date, nrow = 5)
 
 
 ggplot() +
