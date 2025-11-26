@@ -99,4 +99,17 @@ intersections <- st_intersection(counties_5070, hexgrid) %>%
 
 ggplot() + geom_sf(data=intersections)
 
-st_write(intersections, here("Data/data-products/geo-hexes/intersectionPolygons.shp"))
+st_write(intersections, here::here("Data/data-products/geo-hexes/intersectionPolygons.shp"))
+
+hexes_to_county <- intersections |> st_drop_geometry()|> 
+  filter(
+         ## Taking out the isolated hex at Keywest
+         as.integer(hexid) != 6644) %>%
+  # INLA requires the id to only be 1:N, where N is the total
+  # number of observations; because of this we need to rename the 
+  # hexids to be continuous. 
+  mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
+                        as.numeric(hexid) - 1),
+         hexid = as.character(hexid))
+
+vroom::vroom_write(x = hexes_to_county, file = "Data/data-sources/hexid-fips-map.csv")

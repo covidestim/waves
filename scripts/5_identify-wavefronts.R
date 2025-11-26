@@ -24,17 +24,17 @@ idWavefront <- function(hexObs,
                                     centroid = st_centroid(geometry))
 
 ### Check that the data set is nonempty: 
-    if (sum(filtHexObs$wavefront) == 0) {
+    if (sum(filtHexObs$wavefront, na.rm = T) == 0) {
         print(paste("No hexes identified above threshold of", infThreshold, 
                     "infections per day. Maximum infections estimated on", t,
                     "is", 
-                    round(max((hexObs %>% dplyr::filter(date == t))[,"mean"])*1e5)))
+                    round(max((hexObs %>% dplyr::filter(date == t))[,"mean"], na.rm = T)*1e5)))
         # break()
     } else{
-        print(paste("Identified", sum(filtHexObs$wavefront), 
+        print(paste("Identified", sum(filtHexObs$wavefront, na.rm = T), 
                     "hexes with daily infections per capita greater than", 
                     infThreshold,".", 
-                    "This represents", round(sum(filtHexObs$wavefront)/length(unique(filtHexObs$hexid)),2)*100, 
+                    "This represents", round(sum(filtHexObs$wavefront,na.rm = T)/length(unique(filtHexObs$hexid)),2)*100, 
                     "% of all hexes."))
     }
 
@@ -62,7 +62,7 @@ plotBound <- ggplot() +
 
 
 ### Calculate the length of the boundary 
-boundLength <- sum(st_length(boundary))
+boundLength <- sum(st_length(boundary), na.rm = T)
 
 ### Create a list of the relevant outputs 
 waveFrontList <- list("wave" = wave, 

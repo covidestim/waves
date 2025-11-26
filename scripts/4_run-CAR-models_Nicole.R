@@ -45,20 +45,13 @@ hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observati
   mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
                         as.numeric(hexid) - 1),
          hexid = as.character(hexid)) %>% 
-  filter(population > 0)# |> 
-#   mutate(infectionsPC = case_when(population == 0 ~ 0,
-#                                   population !=0 & infectionsPC == 0 ~ NA,
-#                                   TRUE~infectionsPC))
+  filter(populationTotal > 0) 
 
-
-## Hexgrid Population
-hexgrid_pop <- vroom::vroom("Data/data-products/geo-hexes/pop/hexgrid_1100_km_meta_pop.csv")
-
-# hexgrid_preomicronGEOM <- hexgrid_preomicron %>% filter(date==alpha_peak) %>% 
-#   left_join(hexes, by="hexid") 
+# hexgrid_preomicronGEOM <- hexgrid_preomicron %>% filter(date==delta_peak) %>%
+#                           left_join(hexes, by="hexid")
 # 
-# ggplot() + geom_sf(data=hexgrid_preomicronGEOM, 
-#                    aes(geometry=geometry, fill=population))
+# ggplot() + geom_sf(data=hexgrid_preomicronGEOM %>% filter(infectionsPC > 0),
+#                    aes(geometry=geometry, fill=infectionsPC))
 # 
 # alphaPeakPop <- hexgrid_preomicron %>% filter(date==alpha_peak) %>% 
 #                 select(population) 
@@ -193,10 +186,10 @@ hyper_smooth <- list(
 ### Priors for BYM2 model ###
 ### Strict smoothing prior ### 
 hyper_smooth_bym2 <- list(
-  phi = list(prior = "pc", param = c(0.95, 0.5)),  # 50% prob ϕ > 0.95
-  # phi = list(prior = "logitbeta", param = c(0.69, 0.69)),  # 50% prob ϕ > 0.95
-  prec = list(prior = "pc.prec", param = c(0.2, 0.01)#, 
-              # fixed=TRUE, initial=1e-8
+  phi = list(prior = "pc", param = c(0.95, 0.9),
+             initial = 0.9),
+  prec = list(prior = "pc.prec", param = c(0.2, 0.01) 
+              # fixed=TRUE, initial=(6.825076e-03)*.90
               )
 )
 
@@ -229,8 +222,8 @@ diag.eps = 1e-3
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-04")
 
-days <- c(seq.Date(from = alpha_peak-63, to = alpha_peak, by = "day"),
-           seq.Date(from = delta_peak-63, to = delta_peak, by = "day"))
+# days <- c(seq.Date(from = alpha_peak-63, to = alpha_peak, by = "day"))#,
+           days <- (seq.Date(from = delta_peak-63, to = delta_peak, by = "day"))
 
 ###############################################################################
 ##### Check if this is an initial run or a rerun.                         #####
@@ -317,25 +310,23 @@ test_dates <- c(c(alpha_peak-63,
                   alpha_peak-24,
                   alpha_peak),
                 c(delta_peak-63,
+                  delta_peak-54,
                   delta_peak-45,
+                  delta_peak-39,
+                  delta_peak-30,
                   delta_peak-24,
+                  delta_peak-11,
                   delta_peak))
 } 
 
 # cat("Will rerun for :", length_dates_to_rerun, "dates! \n")
-# days <- test_dates[5:8]
-
-days <- seq.Date(
-  from = delta_peak-63,
-  to = delta_peak,
-  by = "day"
-)
-
+# days <- test_dates[5:12]
+# days <- as.Date("2020-09-26")
 ###############################################################################
 ##### Run the model 
 ##############################################################################|
-for (i in 28:length(days)) {
-# for (i in 5:8) {
+# for (i in 1:length(days)) {
+for (i in which(days %in% bad.runs[4])) {
   #### If there is nothing to rerun go to the next date
   #### might need to fix for first run - check. 
   if (is.rerun == TRUE){
@@ -365,12 +356,12 @@ for (i in 28:length(days)) {
       # set.seed(.Random.seed) ## change the seed for reruns 
       ### Call the BYM2 model with INLA
       best_model <- inla(
-        as.formula(infectionsPC ~ 1 + 
+        as.formula(log(infectionsPC) ~ 1 + 
                      f(id, ### either need to update data above or id to hexid
                        model = "bym2", 
                        graph = hexes_graph,
                        scale.model = TRUE, 
-                      #  diagonal = diag.eps,
+                       # diagonal = diag.eps,
                        constr = TRUE, ## sum to zero constraint 
                        hyper = hyper_smooth_bym2)),
         data = as.data.frame(hex_week),
@@ -381,7 +372,7 @@ for (i in 28:length(days)) {
         control.predictor = predictor_list,
         # control.fixed = list(prec.intercept = 0.1),
         num.threads = 1,  # Prevent internal threading conflicts (needs to be 1 for parallelized code)
-        verbose = T
+        # verbose = T
       )
       
     }, error = function(e) {
@@ -390,11 +381,11 @@ for (i in 28:length(days)) {
       # set.seed(.Random.seed)
       
       best_model <- inla(
-        as.formula(infectionsPC ~ 1 + 
+        as.formula(log(infectionsPC) ~ 1 + 
                      f(id, 
                        model = "bym2",
                        graph = hexes_graph,
-                       diagonal = diag.eps,
+                       # diagonal = diag.eps,
                        scale.model = TRUE,
                        constr = TRUE,
                        hyper = hyper_smooth_bym2)),
@@ -406,49 +397,48 @@ for (i in 28:length(days)) {
         control.predictor = predictor_list,
         # control.fixed = list(prec.intercept = 0.1),
         num.threads = 1,  # Prevent internal threading conflicts
-        verbose = T
+        # verbose = T
       )
     })
     
     counter <- counter + 1
     # Update while condition
-    # if(length(CAR_list) >= 2){
-    #   ## Create a vector of size 2 that will check for big drop in the median value for the sd
-    #   vec_1 <- data.frame(
-    #     upper_sd  = range(CAR_list[[i-1]]$sd)[2],
-    #     median_sd = median(CAR_list[[i-1]]$sd))
+    if(i >= 2){
+      ## Create a vector of size 2 that will check for big drop in the median value for the sd
+      vec_1 <- data.frame(
+        upper_sd  = range(CAR_list[[i-1]]$sd)[2],
+        median_sd = median(CAR_list[[i-1]]$sd))
       
-    #   vec_2 <- data.frame(
-    #     upper_sd  = range(best_model$summary.fitted.values$sd)[2],
-    #     median_sd = median(best_model$summary.fitted.values$sd))
+      vec_2 <- data.frame(
+        upper_sd  = range(best_model$summary.fitted.values$sd)[2],
+        median_sd = median(best_model$summary.fitted.values$sd))
       
-    #   ### We cannot check the "after" until we have the full dataset. 
-    #   ### We will revisit this after running one peak to see if necessary. 
+      ### We cannot check the "after" until we have the full dataset. 
+      ### We will revisit this after running one peak to see if necessary. 
       
-    #   # vec_3 <- data.frame(
-    #   #   upper_sd  = range(CAR_list[[i+1]]$sd)[2],
-    #   #   median_sd = median(CAR_list[[i+1]]$sd))
+      # vec_3 <- data.frame(
+      #   upper_sd  = range(CAR_list[[i+1]]$sd)[2],
+      #   median_sd = median(CAR_list[[i+1]]$sd))
       
-    #   vec <- rbind(vec_1, vec_2) #, vec_3)
+      vec <- rbind(vec_1, vec_2) #, vec_3)
       
-    #   ### These check for "bad" runs for certain dates. If 
-    #   ### either are true, rerun that date.  
-    #   # Position 2 is the rerun position
-    #   # 1) big drop in median vs. either neighbor
-    #   drop_prev <- (vec$median_sd[1] - vec$median_sd[2]) > 3
-    #   # drop_next <- (vec$median_sd[3] - vec$median_sd[2]) > 3
-    #   median_drop <- drop_prev #|| drop_next
+      ### These check for "bad" runs for certain dates. If 
+      ### either are true, rerun that date.  
+      # Position 2 is the rerun position
+      # 1) big drop in median vs. either neighbor
+      drop_prev <- (vec$median_sd[1] - vec$median_sd[2]) > 3
+      # drop_next <- (vec$median_sd[3] - vec$median_sd[2]) > 3
+      median_drop <- drop_prev #|| drop_next
       
-    #   # 2) big spike in upper vs. both neighbors
-    #   spike_prev <- (vec$upper_sd[2] - vec$upper_sd[1]) > 3
-    #   # spike_next <- (vec$upper_sd[2] - vec$upper_sd[3]) > 3
-    #   upper_spike <- spike_prev #&& spike_next
+      # 2) big spike in upper vs. both neighbors
+      spike_prev <- (vec$upper_sd[2] - vec$upper_sd[1]) > 3
+      # spike_next <- (vec$upper_sd[2] - vec$upper_sd[3]) > 3
+      upper_spike <- spike_prev #&& spike_next
       
-    #   while_condition <- median_drop || upper_spike
+      while_condition <- median_drop || upper_spike
       
-    # } else {
-      if(!is.null(best_model)){while_condition <- FALSE}
-  # }
+    } else {
+      while_condition <- FALSE}
   }
   
   cat("Finished CAR model for week ", as.character(current_date),"! \n")
@@ -469,31 +459,26 @@ for (i in 28:length(days)) {
 # stopCluster(cl)
 
 ## Turning into a df
-CAR_df2 <- bind_rows(CAR_list)
-
-## Joining dates ran
-CAR_joined <- rbind(CAR_df, CAR_df2 |> filter(date != "2021-07-29"))
-range(unique(CAR_joined$date))
-length(unique(CAR_joined$date))
-
-# CAR_diag_df <- bind_rows(CAR_diag_list)
+## last good day 2020-10-13
+CAR_df <- bind_rows(CAR_list)
+# CAR_df <- bind_rows(CAR_list[-length(CAR_list)])
 
 ## Saving the df, remember to change the name if the dataset is "preomicron" or "omicronera". The pattern nomenclature to files are tsa_preomicron.csv or tsa_omicronera.csv
-dataset <- "wave2_hexgrid1100km_run_preomicron_daily_"
+# dataset <- "hexgrid1100km_run_preomicron_daily_wave1"
 
-vroom::vroom_write(x = CAR_joined, 
-                   file = paste0("Data/data-products/car_", 
-                                 dataset,
-                                 ".csv"))
+# vroom::vroom_write(x = CAR_df,
+#                    file = paste0("Data/data-products/car_",
+#                                  dataset,
+#                                  ".csv"))
 # 
 # ## Saving as list object
-# saveRDS(CAR_list, 
-#      file = "Data/data-products/car_list.RDS")
+# saveRDS(CAR_list,
+# file = "Data/data-products/car_list_wave2.RDS", version=2)
 # save(list = CAR_list, 
 #      file = "Data/data-products/car_list.RDS", 
 #      compress = "xz", 
 #      compression_level = 9)
-# CAR_list <- readRDS("Data/data-products/car_list_Wave1_testDates.RDS")
+# CAR_list <- readRDS("Data/data-products/car_list_Wave1.RDS")
 ###############################################################################
 ##### CHECK WHETHER THE MODEL FIT with some plots #####
 ###############################################################################
@@ -537,7 +522,7 @@ hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |>
 
 
 CAR_df_test <- CAR_df |> 
-  filter(date %in% test_dates[5:8]) |> 
+  # filter(date %in% test_dates) |> 
   right_join(hexes) |>
   st_as_sf()
 
@@ -548,49 +533,92 @@ breaks_plt <- c(0,seq(25,275, 25))
 labels_plt <- c("25< ",seq(25,250, 25), ' >250')
 limits_plt <- c(0,300)
 
-test_hex <- left_join(hexes, hex_week) |> cbind(mean = best_model$summary.fitted.values$mean)
-
-test_hex_bym2 <- test_hex
-test_hex_besag2 <- test_hex
-
 ggplot() +
-  geom_sf(data = test_hex_besag2,
-          aes(fill = log(infectionsPC)), color = NA)+
-  # scale_fill_viridis_b(option = color_option,
-  #                      # name = "Estimated Infections/1000/week",
-  #                      direction = -1,
-  #                      na.value = na_color,
-  #                      breaks = breaks_plt,
-  #                      labels = labels_plt,
-  #                      limits = limits_plt,
-  # )+
-  scale_fill_viridis_c(option = color_option, 
-                       name = "Estimated Infections/100k/day\n(log)", direction = -1)+
-  geom_sf(data = us_states |> st_transform(crs = 5070), aes(geometry = geometry), fill = NA) +
-  # labs(title = "besag2")+
+  geom_sf(data = CAR_df_test |> 
+            filter(!is.na(date)),
+          aes(fill = mean), color = NA)+
+  scale_fill_viridis_b(option = color_option,
+                       # name = "Estimated Infections/1000/week",
+                       direction = -1,
+                       na.value = na_color,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  # scale_fill_viridis_c(option = color_option, 
+  #                      name = "Estimated Infections/100k/day", direction = -1)+
+  geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
   theme_minimal()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
-        legend.key.width = grid::unit(1, "in"))# +
-#   facet_wrap(.~date, nrow = 2)
+        legend.key.width = grid::unit(1, "in"))+
+  facet_wrap(.~date, nrow = 7)
 
 
 ggplot() +
   geom_sf(data = CAR_df_test |> 
-            filter(date == alpha_peak),
-          aes(fill = mean), color = NA)+
-  # scale_fill_viridis_b(option = color_option,
-  #                      # name = "Estimated Infections/1000/week",
-  #                      direction = -1,
-  #                      na.value = na_color,
-  #                      breaks = breaks_plt,
-  #                      labels = labels_plt,
-  #                      limits = limits_plt,
-  # )+
-  scale_fill_viridis_c(option = color_option,
-                       name = "Estimated Infections/100k/day", direction = -1)+
+            # filter(date == "2020-10-28"),
+            filter(date == days),
+          aes(fill = infectionsPC), color = NA)+
+  scale_fill_viridis_b(option = color_option,
+                       # name = "Estimated Infections/1000/week",
+                       direction = -1,
+                       na.value = na_color,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  # scale_fill_viridis_c(option = color_option,
+  #                      name = "Estimated Infections/100k/day", direction = -1)+
   geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
   theme_minimal()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1, "in"))
+
+
+ggplot() +
+  geom_sf(data = CAR_df_test |> 
+            # filter(date == "2020-10-28"),
+            # filter(date == days),
+            filter(date %in% bad.runs),
+          aes(fill = infectionsPC), color = NA)+
+  scale_fill_viridis_b(option = color_option,
+                       # name = "Estimated Infections/1000/week",
+                       direction = -1,
+                       na.value = na_color,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  # scale_fill_viridis_c(option = color_option,
+  #                      name = "Estimated Infections/100k/day", direction = -1)+
+  geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
+  theme_minimal()+
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1, "in"))+
+  facet_wrap(.~date, nrow = 3)
+
+ggplot() +
+  geom_sf(data = CAR_df_test |> 
+            # filter(date == "2020-10-28"),
+            # filter(date == days),
+            filter(date %in% bad.runs),
+          aes(fill = mean), color = NA)+
+  scale_fill_viridis_b(option = color_option,
+                       # name = "Estimated Infections/1000/week",
+                       direction = -1,
+                       na.value = na_color,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  # scale_fill_viridis_c(option = color_option,
+  #                      name = "Estimated Infections/100k/day", direction = -1)+
+  geom_sf(data = us_states, aes(geometry = geometry), fill = NA) +
+  theme_minimal()+
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1, "in"))+
+  facet_wrap(.~date, nrow = 3)
