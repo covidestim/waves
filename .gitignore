@@ -13,6 +13,7 @@
 .RData
 .Rhistory
 .Rproj.user
+.Rproj.user/B678A8B1/explorer-cache/d20c11b09f734a5595df23f6834e20c2
 .Rproj.user/B678A8B1/jobs/490AF0EB-output.json
 .vscode
 *.gif
@@ -121,6 +122,7 @@ data-sources/cbg-polygons/cb_2019_us_bg_500k.shp
 data-sources/fips-immunity.csv
 Data/data-products/boundaryPlots/firstWaveModel/boundaryDatafirst.rds
 Data/data-products/boundaryPlots/secondWaveModel/boundaryDatasecond.rds
+Data/data-products/car_hexgrid1100km_run_preomicron_daily_wave2.csv
 Data/data-products/car_TESTING.hexgrid1100km_run_preomicron_daily.csv.gz
 Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv
 Data/data-products/geo-hexes/observations_preomicron.dbf
@@ -132,7 +134,10 @@ Data/data-products/tsa_meta30m_run_preomicron_daily.csv
 Data/data-products/tsa_preomicron.csv
 Data/data-products/wavefronts/boundaryData_firstWave.rds
 Data/data-products/wavefronts/boundaryData_secondWave.rds
+Data/data-products/wavefronts/gam_boundaryData_firstWave.rds
+Data/data-products/wavefronts/gam100_boundaryData_firstWave.rds
 Data/data-sources/cbg-polygons/cb_2019_us_bg_500k.shp
+Data/data-sources/countyPolygon.shp
 img/besag2_test_week.gif
 img/daily_hex_preomicron.gif
 img/extra_figures/fig3c_preomicron_main.pdf
