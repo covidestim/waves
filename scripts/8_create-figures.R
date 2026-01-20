@@ -424,13 +424,13 @@ ggsave(plot = fig1,
        dpi = 300
 )
 
-# ## hexgrids
-# dataset <- "meta30m_run_preomicron_daily"
+## hexgrids
+dataset <- "adaptiveStartVals"
 
-# ## Pre-Omicron
-# CAR_df_preomicron <- vroom::vroom(paste0("Data/data-products/tsa_",
-#                                          dataset, 
-#                                          ".csv"))
+## Pre-Omicron
+CAR_df_preomicron <- vroom::vroom(paste0("Data/data-products/car_",
+                                         dataset, 
+                                         ".csv"))
 
 ## Fig.2 Spatial hexes, population and infections
 
@@ -1209,26 +1209,22 @@ threshold_mean <- quantile(CAR_df_preomicron$mean, probs = 0.50, na.rm = TRUE)
 threshold_mean <- quantile(CAR_df_preomicron$mean, probs = 0.99, na.rm = TRUE)
 
 ## hexgrids
-# dataset <- "meta30m_run_preomicron_daily"
+dataset <- "adaptiveStartVals"
 
-# ## Pre-Omicron
-# CAR_df_preomicron <- vroom::vroom(paste0("Data/data-products/tsa_",
-#                                          dataset, 
-#                                          ".csv"))
+## Pre-Omicron
+CAR_df_preomicron <- vroom::vroom(paste0("Data/data-products/car_",
+                                         dataset, 
+                                         ".csv"))
+
+## Threshold for filtering given the distribution, any value of trend that it is above the 3rd Quarter of the trend distribution
+threshold_mean <- quantile(CAR_df_preomicron$mean, prob=0.75, na.rm=TRUE)
+
 ## peak date
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-04")
 
-hexes <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |> 
-         filter(
-         # Taking out the isolated hex at Keywest
-         as.integer(hexid) != 6644) %>%
-         # INLA requires the id to only be 1:N, where N is the total
-         # number of observations; because of this we need to rename the 
-         # hexids to be continuous. 
-         mutate(hexid = ifelse(as.numeric(hexid) < 6645, as.numeric(hexid), 
-                               as.numeric(hexid) - 1),
-                hexid = as.character(hexid))
+## Hexgrid
+hexes1 <- sf::st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp")
 
 ## Pre-Omicron
 CAR_lag_alpha <- CAR_df_preomicron |> 
@@ -1362,23 +1358,24 @@ fig4c <- ggplot()+
   geom_vline(xintercept = seq(7,63,7), lty = "dotted", color = "grey50")+
   theme_minimal()+
   labs(x = "Days before national curve peak", 
-       y = "Areal expansion rate")+
+       y = "Rate of areal expansion")+
   scale_x_reverse(breaks = seq(7,63,7))+
   units::scale_y_units(labels = scales::label_comma(),
                        breaks = scales::breaks_extended(n = 10))+
   colorspace::scale_fill_discrete_divergingx(name = "")+
   theme(legend.position = "bottom",
         legend.title = element_text(hjust = 0.5),
-        axis.text = element_text(size = 12))
+        axis.text = element_text(size = 12)) + 
+  ggtitle("Rate of areal expansion")
 fig4c
 
-ggsave(filename = "Figures/extra_figures/figS2b.png",
+ggsave(filename = here("figures/fig3.png"),
        plot = fig4c,
        width = 16,
        height = 9,
        dpi = 200)
 
-ggsave(filename = "Figures/extra_figures/figS2b.pdf",
+ggsave(filename = here("figures/fig3.pdf"),
        plot = fig4c,
        width = 16,
        height = 9,
@@ -1423,6 +1420,7 @@ ggsave(filename = "Figures/figS2.pdf",
 #        dpi = 300)
 
 hexgrid2 <- sf::st_read("Data/data-products/hexgrid.geojson")
+hexgrid <- sf::st_read("Data/data-products/geo-hexes/hexgrid_1100_km_meta_pop.shp")
 
 ## Heatmaps for the velocity
 distanceToFront.df_first <- sf::st_read("Data/data-products/boundaryPlots/firstWaveModel/firstDistanceToFront.shp") |> 
@@ -1431,13 +1429,19 @@ distanceToFront.df_first <- sf::st_read("Data/data-products/boundaryPlots/firstW
 distanceToFront.df_second <- sf::st_read("Data/data-products/boundaryPlots/secondWaveModel/secondDistanceToFront.shp")|> 
   rename(distToFront = dstTFrn)
 
-wave1Stats <- vroom::vroom("Data/data-sources/wave1Characteristics.csv") |> 
+wave1Stats <- vroom::vroom("Data/data-products/wave1Characteristics.csv") |> 
   mutate(wave = "1st")
 
-wave2Stats <- vroom::vroom("Data/data-sources/wave2Characteristics.csv") |> 
+wave2Stats <- vroom::vroom("Data/data-products/wave2Characteristics.csv") |> 
   mutate(wave = "2nd")
 
-waveStatsJoined <- rbind(wave1Stats, wave2Stats)
+waveStatsJoined <- rbind(wave1Stats, wave2Stats) %>%
+                   mutate(wave = ifelse(wave == "1st", 
+                                        "1st wave", 
+                                        "2nd wave"))
+colnames(waveStatsJoined)[1] <- "Days before peak"
+colnames(waveStatsJoined)[3] <- "Recruitment rate (km2/day)"
+colnames(waveStatsJoined)[5] <- "Mean speed (km/day)"
 
 fig4a <- ggplot()+
   geom_col(data = waveStatsJoined,
@@ -1447,59 +1451,72 @@ fig4a <- ggplot()+
   geom_vline(xintercept = 7, color = "grey80", lty = "dashed")+
   geom_vline(xintercept = seq(7,63,7), lty = "dotted", color = "grey50")+
   theme_minimal()+
+  colorspace::scale_fill_discrete_divergingx(name = "")+
+  scale_y_continuous(labels = scales::label_comma()) + 
   labs(x = "Days before national curve peak", 
-       y = "Areal expansion rate \n [km2/day]")+
+       y = "Daily mean rate of areal expansion \n [km2/day]")+
   scale_x_reverse(breaks = seq(7,63,7))+
   colorspace::scale_fill_discrete_divergingx(name = "")+
   theme(legend.position = c(0.10,0.90),
         legend.text = element_text(size = 12),
         legend.title = element_text(hjust = 0.5),
-        axis.text = element_text(size = 12))
+        axis.text = element_text(size = 12)) + 
+  ggtitle("Rate of areal expansion")
+
 fig4a
 
-ggsave(plot = fig4a, filename = "Figures/fig4a.png", width = 16, height = 9, dpi = 300)
+ggsave(plot = fig4a, filename = here("figures/fig3a.tif"), width = 16, height = 9, dpi = 300)
 
 fig4b <- ggplot()+
   geom_col(data = waveStatsJoined,
-           aes(x = `Days before peak`, y = `Median speed (km/day)`, fill = wave),
+           aes(x = `Days before peak`, y = `Mean speed (km/day)`, fill = wave),
            alpha = 0.75,
            position = position_dodge())+
   geom_vline(xintercept = 7, color = "grey80", lty = "dashed")+
   geom_vline(xintercept = seq(7,63,7), lty = "dotted", color = "grey50")+
   theme_minimal()+
   labs(x = "Days before national curve peak", 
-       y = "Wavefront Speed \n [km/day]")+
+       y = "Daily mean wavefront speed \n [km/day]")+
+  colorspace::scale_fill_discrete_divergingx(name = "")+
   scale_x_reverse(breaks = seq(7,63,7))+
   theme(legend.position = c(0.10,0.90),
         legend.text = element_text(size = 12),
         legend.title = element_text(hjust = 0.5),
-        axis.text = element_text(size = 12))
+        axis.text = element_text(size = 12)) + 
+  ggtitle("Wavefront speed")
 fig4b
 
-ggsave(plot = fig4b, filename = "Figures/fig4b.png", width = 16, height = 9, dpi = 300)
+ggsave(plot = fig4b, filename = here("figures/fig3b.tif"), width = 16, height = 9, dpi = 300)
+
+ggsave( plot = (fig4a+fig4b) + plot_layout(nrow=2, guides = "collect") & 
+  theme(legend.position = 'bottom',
+        legend.direction = 'horizontal'), 
+  filename = here("figures/fig3.tif"),
+  width = 8.5, height = 11, dpi = 300) 
 
 ## Wavefront speed figure
 ## first wave panels
 firstBound <- st_read("Data/data-products/firstWaveBound.shp")
-secondBound <- st_read("Data/data-products/secondWaveBound.shp")
+secondBound <- st_read("~/Downloads/SecondWaveBound.shp")
 
 date_displayed <- alpha_peak-63
+
 plt1 <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
   geom_sf(data=firstBound |> 
-            filter(wave_dt ==date_displayed), 
-          mapping=aes(geometry= geometry, fill="Hex not in a wave")) +
-  geom_sf(data=distanceToFront.df_first|> 
             filter(date ==date_displayed), 
-          mapping=aes(geometry= geometry, 
-                      color=distToFront/1000), size=1.5) +
-  geom_sf(data=distanceToFront.df_first %>% filter(distToFront ==0)|> 
-            filter(date ==date_displayed), 
-          mapping=aes(geometry= geometry), color = "black", size=1.5) +
-  scale_color_viridis_b(limits=c(0, 1500), option = "C", 
-                        breaks=c(0, 50, 100, 200, 500, 1000, 1500), 
-                        name = "Distance to nearest point\non boundary at t+1\n(in km/day)") +
-  scale_fill_manual(values = c("grey80", "grey50"))+
+          mapping=aes(geometry= geometry, fill="Hex not in a wave")) + 
+  # geom_sf(data=distanceToFront.df_first|>
+  #           filter(date ==date_displayed),
+  #         mapping=aes(geometry= geometry,
+  #                     color=distToFront/1000), size=1.5) +
+  # geom_sf(data=distanceToFront.df_first %>% filter(distToFront == 0)|>
+  #           filter(date ==date_displayed),
+  #         mapping=aes(geometry= geometry), color = "black", size=1.5) +
+  # scale_color_viridis_b(limits=c(0, 1500), option = "C", 
+  #                       breaks=c(0, 50, 100, 200, 500, 1000, 1500), 
+  #                       name = "Distance to nearest point\non boundary at t+1\n(in km/day)") +
+  # scale_fill_manual(values = c("grey80", "grey30"))+
   guides(fill = guide_legend(override.aes = list(size = 5, shape = 17)))+
   theme_void()+
   labs(title = date_displayed)
@@ -1621,7 +1638,7 @@ date_displayed <- delta_peak-21
 plt7 <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
   geom_sf(data=secondBound |> 
-            filter(wave_dt ==date_displayed), 
+            filter(date ==date_displayed), 
           mapping=aes(geometry= geometry, fill="Hex not in a wave")) +
   geom_sf(data=distanceToFront.df_second|> 
             filter(date ==date_displayed), 
