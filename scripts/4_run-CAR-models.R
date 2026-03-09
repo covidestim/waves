@@ -352,10 +352,16 @@ for (i in 28:length(days)) {
   ## counter for while
   counter <- 0
   while_condition <- TRUE
-  
-  ### Going to run the model 10 times for bad dates. 
-  while ((while_condition) & counter <= 10) {  # Flipped condition
+  initial_value <- 0.1
+  while ((while_condition) & counter <= 8) {  
     
+    hyper_smooth_bym2 <- list(
+      phi = list(prior = "pc", param = c(.5, 2/3),
+                 initial=initial_value), 
+      prec = list(prior = "pc.prec", param = c(0.2, 0.01)
+      )
+    )
+
     cat("Attempt to fit the model number: ", counter, "!\n")
     ### sometimes a bad date can break the INLA model, this tryCatch
     ### is to avoid escaping the loop due to one date error. 

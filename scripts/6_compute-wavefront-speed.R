@@ -31,14 +31,10 @@ hexgrid %>% st_union() -> simpHexgrid
 st_crs(hexgrid)
 
 ### Load in the new observations from the CAR model
-CAR_df_preomicron_w1 <- readRDS("Data/data-products/car_list_wave1_adaptStart.rds") |> 
-  bind_rows() |> 
-  mutate(wave = "1st Wave")
-CAR_df_preomicron_w2 <- readRDS("Data/data-products/car_list_wave2_adaptStart.rds") |> 
-  bind_rows() |> 
-  mutate(wave = "2nd Wave")
-
-obs <- rbind(CAR_df_preomicron_w1, CAR_df_preomicron_w2)
+obs <- read.csv(here("Data/data-products/car_adaptiveStartVals.csv")) %>% 
+  mutate(hexid = as.character(hexid), 
+         date = as.Date(date), 
+         mean = as.numeric(mean))
 
 ### Define the two areas prior to the peaks  
 CAR_lag_first <- obs %>% 
@@ -56,7 +52,7 @@ CAR_lag_second <- obs %>%
   st_as_sf() 
 
 ### Set the infection threshold for the boundary definition
-inf_threshold <- 190
+inf_threshold <- quantile(obs$mean, probs = 0.75)
 
 ### Source in the wavefront script that defines the boundaries
 source(here::here("scripts/5_identify-wavefronts.R"))
@@ -83,8 +79,8 @@ for(i in -63:0){
   dev.off()
 }
 
-saveRDS(boundList_w1, file = here("data-products/wavefronts/boundaryData_firstWave.rds"), version = 2)
-# boundList_w1 <- readRDS(here("data-products/wavefronts/boundaryData_firstWave.rds"))
+saveRDS(boundList_w1, file = here("Data/data-products/wavefronts/boundaryData_firstWave.rds"), version = 2)
+# boundList_w1 <- readRDS(here("Data/data-products/wavefronts/boundaryData_firstWave.rds"))
 
 ## Saving as a .shp
 waveList_w1 <- list()
@@ -100,6 +96,8 @@ sf::st_write(obj = wave1.df,
   delete_dsn = T,
   delete_layer = T)
 
+nrow(boundList_w1[[1]][[1]])*1100
+nrow(boundList_w1[[64]][[1]])*1100
 ###############################################################################
 ########### CALCULATE AND PLOT DISTANCE TO NEAREST POINT ######################
 ########### ON THE FRONTIER FOR EACH LINESTRING AT EACH #######################
@@ -119,34 +117,57 @@ for (i in 2:length(boundList_w1)){
   growth_w1[i-1] <- as.numeric(boundList_w1[[i]]["boundary length"]) - as.numeric(boundList_w1[[i-1]]["boundary length"])
   
   ### change in area 
-  arealExpansion_w1[i-1] <- (nrow(boundList_w1[[i]][["wave"]]) - nrow(boundList_w1[[i-1]][["wave"]]))*64.75
+  arealExpansion_w1[i-1] <- (nrow(boundList_w1[[i]][["wave"]]) - nrow(boundList_w1[[i-1]][["wave"]]))*1100
   ### distance between wavefronts
-  dist_wf <- st_distance(boundList_w1[[i-1]][["boundary"]][,"geometry"], boundList_w1[[i]][["boundary"]][,"geometry"])
+  dist_wf <- st_distance(st_cast(boundList_w1[[i-1]][["boundary"]][,"geometry"], "POINT"),
+                         st_cast(boundList_w1[[i]][["boundary"]][,"geometry"], "POINT"))
   ### distance between wavefronts and edge of the United States
-  dist_us <- st_distance(boundList_w1[[i-1]][["boundary"]][,"geometry"], st_boundary(simpHexgrid))
-  dist_min <-cbind(boundList_w1[[i-1]][["boundary"]][,c("hexid", "date")], 
-                   apply(X=dist_wf, MARGIN=1, FUN=min, na.rm = TRUE),
-                   apply(X=dist_us, MARGIN=1, FUN=min, na.rm = TRUE))
+  dist_us <- st_distance(st_cast(boundList_w1[[i-1]][["boundary"]][,"geometry"], "POINT"),
+                         st_boundary(simpHexgrid))
+  
+  dist_min <- cbind(st_cast(boundList_w1[[i-1]][["boundary"]][,c("hexid", "date")], "POINT"), 
+                    apply(X=dist_wf, MARGIN=1, FUN=min, na.rm = TRUE),
+                    apply(X=dist_us, MARGIN=1, FUN=min, na.rm = TRUE))
   
   colnames(dist_min)[3] <- "distToFront0"; colnames(dist_min)[4] <- "distToUS"
   
-  speed <- dist_min %>% rowwise() %>% mutate(distToFront = min(distToFront0, distToUS))
-  distanceToFrontier_w1[[i-1]] <- speed
+  checkUSA <- (st_intersects(st_cast(boundList_w1[[i-1]][["boundary"]], "POINT"), 
+                             st_cast(simpHexgrid, "MULTILINESTRING")))
+  
+  distToFront <- vector()
+  for (l in 1:nrow(st_cast(boundList_w1[[i-1]][["boundary"]], "POINT"))){
+    if(is.na(as.numeric(checkUSA[l]))){
+      distToFront[l] <- min(st_drop_geometry(dist_min[l, "distToUS"]), st_drop_geometry(dist_min[l, "distToFront0"]))
+    } else {
+      distToFront[l] <- as.numeric(unlist(st_drop_geometry(dist_min[l, "distToFront0"])))
+    }
+  }
+  
+  # speed <- dist_min %>% rowwise() %>% mutate(distToFront = min(distToFront0, distToUS))
+  distanceToFrontier_w1[[i-1]] <- cbind(dist_min, distToFront)
 }
+
+mean(arealExpansion_w1)
+range(arealExpansion_w1)
+
+wave1char <- data.frame("Days before peak" = 63:1,
+                        "Wave edge length" = waveEdge_w1,
+                        "Areal wave expansion" = arealExpansion_w1)
+saveRDS(wave1char, file=here("Data/data-products/wave1-lengtharea.rds"), version=2)
 
 #### Calculate the weekly speed as well to confirm that the mean summary 
 #### not particularly sensitive to time 
-distanceToFrontier_w1_weekly <- list()
-for (i in 8:length(boundList_w1)){
-  x1<- st_distance(boundList_w1[[i-7]][["boundary"]][,"geometry"], boundList_w1[[i]][["boundary"]][,"geometry"]) /1000
-  x2 <-cbind(boundList_w1[[i-7]][["boundary"]][,c("hexid", "date")], apply(X=x1, MARGIN=1, FUN=min, na.rm = TRUE))
-  colnames(x2)[3] <- "distToFront"
-  distanceToFrontier_w1_weekly[[i-7]] <- x2
-}
+# distanceToFrontier_w1_weekly <- list()
+# for (i in 8:length(boundList_w1)){
+#   x1<- st_distance(boundList_w1[[i-7]][["boundary"]][,"geometry"], boundList_w1[[i]][["boundary"]][,"geometry"]) /1000
+#   x2 <-cbind(boundList_w1[[i-7]][["boundary"]][,c("hexid", "date")], apply(X=x1, MARGIN=1, FUN=min, na.rm = TRUE))
+#   colnames(x2)[3] <- "distToFront"
+#   distanceToFrontier_w1_weekly[[i-7]] <- x2
+# }
 
 ### Save for future use ### 
 saveRDS(distanceToFrontier_w1, here::here("Data/data-products/wavefronts/distanceToFrontier_firstWave.rds"), version = 2)
-saveRDS(distanceToFrontier_w1_weekly, here::here("Data/data-products/wavefronts/distanceToFrontier_firstWaveWkly.rds"), version = 2)
+# saveRDS(distanceToFrontier_w1_weekly, here::here("Data/data-products/wavefronts/distanceToFrontier_firstWaveWkly.rds"), version = 2)
 
 ## Creating a data.frame for the distance to the front
 distanceToFront.df_w1 <- bind_rows(distanceToFrontier_w1) |> 
@@ -161,7 +182,7 @@ delete_dsn = T,
 delete_layer = T)
 
 ### Read in the distance data ### 
-# distanceToFrontier_w1 <- readRDS(here("data-products/wavefronts/distanceToFrontier_firstWave.rds"))
+# distanceToFrontier_w1 <- readRDS(here("Data/data-products/wavefronts/distanceToFrontier_firstWave.rds"))
 
 for(i in 1:63){
   date <- unique(distanceToFrontier_w1[[i]]$date)
@@ -222,8 +243,11 @@ for(i in -63:0){
   dev.off()
 }
 
-# saveRDS(boundList_w2, file = here("data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
-boundList_w2 <- readRDS(here("data-products/wavefronts/boundaryData_secondWave.rds"))
+saveRDS(boundList_w2, file = here("Data/data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
+# boundList_w2 <- readRDS(here("Data/data-products/wavefronts/boundaryData_secondWave.rds"))
+
+nrow(boundList_w2[[1]][[1]])*1100
+nrow(boundList_w2[[64]][[1]])*1100
 
 ## Saving as a .shp
 waveList_w2 <- list()
@@ -249,21 +273,48 @@ for (i in 2:length(boundList_w2)){
   growth_w2[i-1] <- as.numeric(boundList_w2[[i]]["boundary length"]) - as.numeric(boundList_w2[[i-1]]["boundary length"])
   ### Calculate the boundary length 
   waveEdge_w2[i-1] <- as.numeric(boundList_w2[[i-1]]["boundary length"]) / 1000
-  arealExpansion_w2[i-1] <- (nrow(boundList_w2[[i]][["wave"]]) - nrow(boundList_w2[[i-1]][["wave"]]))*64.75
+  arealExpansion_w2[i-1] <- (nrow(boundList_w2[[i]][["wave"]]) - nrow(boundList_w2[[i-1]][["wave"]]))*1100
   
   ### distance between wavefronts
-  dist_wf <- st_distance(boundList_w2[[i-1]][["boundary"]][,"geometry"], boundList_w2[[i]][["boundary"]][,"geometry"])
+  dist_wf <- st_distance(st_cast(boundList_w2[[i-1]][["boundary"]][,"geometry"], "POINT"),
+                         st_cast(boundList_w2[[i]][["boundary"]][,"geometry"], "POINT"))
   ### distance between wavefronts and edge of the United States
-  dist_us <- st_distance(boundList_w2[[i-1]][["boundary"]][,"geometry"], st_boundary(simpHexgrid))
-  dist_min <-cbind(boundList_w2[[i-1]][["boundary"]][,c("hexid", "date")], 
-                   apply(X=dist_wf, MARGIN=1, FUN=min, na.rm = TRUE),
-                   apply(X=dist_us, MARGIN=1, FUN=min, na.rm = TRUE))
+  dist_us <- st_distance(st_cast(boundList_w2[[i-1]][["boundary"]][,"geometry"], "POINT"),
+                         st_boundary(simpHexgrid))
+  
+  dist_min <- cbind(st_cast(boundList_w2[[i-1]][["boundary"]][,c("hexid", "date")], "POINT"), 
+                    apply(X=dist_wf, MARGIN=1, FUN=min, na.rm = TRUE),
+                    apply(X=dist_us, MARGIN=1, FUN=min, na.rm = TRUE))
   
   colnames(dist_min)[3] <- "distToFront0"; colnames(dist_min)[4] <- "distToUS"
   
-  speed <- dist_min %>% rowwise() %>% mutate(distToFront = min(distToFront0, distToUS))
-  distanceToFrontier_w2[[i-1]] <- speed
+  checkUSA <- (st_intersects(st_cast(boundList_w2[[i-1]][["boundary"]], "POINT"), 
+                             st_cast(simpHexgrid, "MULTILINESTRING")))
+  
+  distToFront <- vector()
+  for (l in 1:nrow(st_cast(boundList_w2[[i-1]][["boundary"]], "POINT"))){
+    if(is.na(as.numeric(checkUSA[l]))){
+      distToFront[l] <- min(st_drop_geometry(dist_min[l, "distToUS"]), st_drop_geometry(dist_min[l, "distToFront0"]))
+    } else {
+      distToFront[l] <- as.numeric(unlist(st_drop_geometry(dist_min[l, "distToFront0"])))
+    }
+  }
+  
+  # speed <- dist_min %>% rowwise() %>% mutate(distToFront = min(distToFront0, distToUS))
+  distanceToFrontier_w2[[i-1]] <- cbind(dist_min, distToFront)
 }
+
+median(arealExpansion_w2)
+range(arealExpansion_w2)
+
+#### Create a df that holds the characteristics of wave 2 
+wave2char <- data.frame("Days before peak" = 63:1,
+                        "Wave edge length" = waveEdge_w2,
+                        "Areal wave expansion" = arealExpansion_w2)
+saveRDS(wave2char, file=here("Data/data-products/wave2-lengtharea.rds"), version=2)
+#                         "Median speed per day" = , 
+#                         "Mean speed per day" = , 
+#                         "Length of wave greater than median max" = )
 
 #### Calculate the weekly speed as well to confirm that the mean summary 
 #### not particularly sensitive to time 
@@ -276,8 +327,8 @@ for (i in 8:length(boundList_w2)){
 }
 
 ### Save for future use ### 
-saveRDS(distanceToFrontier_w2, here("data-products/wavefronts/distanceToFrontier_secondWave.rds"), version = 2)
-saveRDS(distanceToFrontier_w2_weekly, here("data-products/wavefronts/distanceToFrontier_secondWaveWkly.rds"), version = 2)
+saveRDS(distanceToFrontier_w2, here("Data/data-products/wavefronts/distanceToFrontier_secondWave.rds"), version = 2)
+saveRDS(distanceToFrontier_w2_weekly, here("Data/data-products/wavefronts/distanceToFrontier_secondWaveWkly.rds"), version = 2)
 
 ###############################################################################
 ########### CALCULATE AND PLOT DISTANCE TO NEAREST POINT ######################

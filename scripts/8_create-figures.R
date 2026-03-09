@@ -1454,14 +1454,14 @@ fig4a <- ggplot()+
   colorspace::scale_fill_discrete_divergingx(name = "")+
   scale_y_continuous(labels = scales::label_comma()) + 
   labs(x = "Days before national curve peak", 
-       y = "Daily mean rate of areal expansion \n [km2/day]")+
+       y = "Daily mean areal expansion rate \n [km2/day]")+
   scale_x_reverse(breaks = seq(7,63,7))+
   colorspace::scale_fill_discrete_divergingx(name = "")+
   theme(legend.position = c(0.10,0.90),
         legend.text = element_text(size = 12),
         legend.title = element_text(hjust = 0.5),
         axis.text = element_text(size = 12)) + 
-  ggtitle("Rate of areal expansion")
+  ggtitle("Areal expansion rate")
 
 fig4a
 
