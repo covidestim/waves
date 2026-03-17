@@ -3,6 +3,8 @@ gc()
 
 library(tidyverse)
 library(sf)
+library(patchwork)
+library(units)
 # library(MoMAColors)
 
 ##### Hexgrid |
@@ -57,6 +59,9 @@ us_states <- tigris::states(cb = T) |>
   dplyr::filter(!STATEFP %in% excludes) |> 
   tigris::shift_geometry()|> 
   st_transform(crs = 5070)
+
+##################### Figure 1 #################################
+
 
 new_england_states <- us_states |> 
   dplyr::filter(GEOID %in% c("09","23","25","33","44","50"))
@@ -188,7 +193,7 @@ ggsave(filename = "Figures/extra_figures/fig1c_new.png",
        height = 9, 
        dpi = 100)
 
-library(patchwork)
+
 
 ## Patchwork Population
 hexpop_zoom <- (us_hex_plt | (new_england_hex_plt / ct_hex_plt))+
@@ -382,7 +387,6 @@ ct_hex_infections <-  ggplot() +
         axis.text = element_text(size = 6))
 ct_hex_infections
 
-library(patchwork)
 hex_infections <- (us_hex_infections | (new_england_hex_infections / ct_hex_infections))+
   plot_annotation(tag_levels = 'A')+
   plot_layout(widths = c(4,1,1),
@@ -431,6 +435,8 @@ dataset <- "adaptiveStartVals"
 CAR_df_preomicron <- vroom::vroom(paste0("Data/data-products/car_",
                                          dataset, 
                                          ".csv"))
+
+##################### Figure 2 #################################
 
 ## Fig.2 Spatial hexes, population and infections
 
@@ -569,7 +575,7 @@ CAR_df_preomicron <- CAR_df_preomicron |>
 alpha_peak <- as.Date("2020-11-19")
 delta_peak <- as.Date("2021-09-04")
 
-## 1st Wave snapshots
+######## 1st Wave snapshots ########
 fig2.b <- ggplot()+
   geom_sf(data = CAR_df_preomicron |> 
             filter(date == alpha_peak-63) |> 
@@ -738,7 +744,7 @@ ggsave(plot = fig2.e,
        height = 9, 
        dpi = 200)
 
-## 2nd Wave snapshots
+######## 2nd Wave snapshots ########
 
 fig2.f <- ggplot()+
   geom_sf(data = CAR_df_preomicron |> 
@@ -815,7 +821,7 @@ fig2.g <- ggplot()+
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  labs(title = 'G', subtitle = (delta_peak-63))
+  labs(title = 'G', subtitle = (delta_peak-42))
 fig2.g
 
 ggsave(plot = fig2.g,
@@ -857,7 +863,7 @@ fig2.h <- ggplot()+
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
-  labs(title = 'H', subtitle = (delta_peak-63))
+  labs(title = 'H', subtitle = (delta_peak-21))
 fig2.h
 
 ggsave(plot = fig2.h,
@@ -908,7 +914,6 @@ ggsave(plot = fig2.i,
        height = 9, 
        dpi = 200)
 
-library(patchwork)
 fig2 <- (((fig2.b+ 
              guides(fill = guide_bins(title = "Estimated Infections/100k/week",
                                       title.position = "left",
@@ -1014,7 +1019,7 @@ ggsave(plot = fig2,
        height = 9,
        dpi = 300)
 
-## Sensitivity Analysis
+##################### Sensitivity Analysis #################################
 figS2 <- ggplot(data = CAR_df_preomicron |> 
                   filter(date %in% c(delta_peak, alpha_peak,
                                      delta_peak-21, alpha_peak - 21,
@@ -1126,7 +1131,7 @@ ggsave(plot = figS3,
 ## Fig2A - Layered depiction on transforming estimated infections on counties polygon on hexgrid
 
 ## Figure S4 correlation between trend of 'alpha', 'delta'
-library(units)
+
 
 ## hexgrids
 # dataset <- "meta30m_run_preomicron_daily"
@@ -1190,7 +1195,6 @@ ggsave(filename = "Figures/extra_figures/figS1b.png",
        height = 9,
        dpi = 300)
 
-library(patchwork)
 
 figS2 <- (figS2a | figS2b)
 figS2
@@ -1200,6 +1204,8 @@ ggsave(filename = "Figures/extra_figures/figS1.png",
        width = 16, 
        height = 9, 
        dpi = 100)
+
+###### FIGURE THREE IN MANUSCRIPT #######
 
 ## Threshold for filtering given the distribution, any value of trend that it is above the 3rd Quarter of the trend distribution
 threshold_mean <- quantile(CAR_df_preomicron$mean, probs = 0.90, na.rm = TRUE)
@@ -1680,7 +1686,6 @@ plt8 <- ggplot() +
 plt8
 
 
-library(patchwork)
 fig4 <- (((plt1 / plt2 / plt3 / plt4)) |
            # (fig4a) /
            ((plt5 / plt6 / plt7 / plt8)))+
