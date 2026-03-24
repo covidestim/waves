@@ -31,25 +31,28 @@ hexgrid %>% st_union() -> simpHexgrid
 st_crs(hexgrid)
 
 ### Load in the new observations from the CAR model
-obs <- read.csv(here("Data/data-products/car_adaptiveStartVals.csv")) %>% 
-  mutate(hexid = as.character(hexid), 
-         date = as.Date(date), 
-         mean = as.numeric(mean))
-
 ### Define the two areas prior to the peaks  
-CAR_lag_first <- obs %>% 
-  filter(date %in% seq.Date(from = (first_peak - 63), 
-                                                   to = first_peak, 
-                                                   length.out = 64)) %>% 
-  left_join(hexgrid, by = "hexid") %>% 
-  st_as_sf()
+CAR_lag_first <-  readRDS("Data/data-products/car_list_wave1_adaptStart.rds") %>%  
+                  bind_rows() %>% 
+                  mutate(hexid = as.character(hexid), 
+                         date = as.Date(date), 
+                         mean = as.numeric(mean)) %>% 
+                  filter(date %in% seq.Date(from = (first_peak - 63), 
+                                                                   to = first_peak, 
+                                                                   length.out = 64)) %>% 
+                  left_join(hexgrid, by = "hexid") %>% 
+                  st_as_sf()
 
-CAR_lag_second <- obs %>% 
-  filter(date %in% seq.Date(from = (second_peak - 63), 
-                                                    to = second_peak, 
-                                                    length.out = 64))  %>% 
-  left_join(hexgrid, by = "hexid") %>% 
-  st_as_sf() 
+CAR_lag_second <- readRDS("Data/data-products/car_list_wave2_adaptStart.rds") %>%  
+                  bind_rows() %>% 
+                  mutate(hexid = as.character(hexid), 
+                         date = as.Date(date), 
+                         mean = as.numeric(mean)) %>% 
+                  filter(date %in% seq.Date(from = (second_peak - 63), 
+                                                                    to = second_peak, 
+                                                                    length.out = 64))  %>% 
+                  left_join(hexgrid, by = "hexid") %>% 
+                  st_as_sf() 
 
 ### Set the infection threshold for the boundary definition
 inf_threshold <- quantile(obs$mean, probs = 0.75)
@@ -92,7 +95,7 @@ wave1.df <- bind_rows(waveList_w1)
 
 ## Writting the object as .shp
 sf::st_write(obj = wave1.df,
-  dsn = "Data/data-products/FirstWaveBound.shp",
+  dsn = "Data/data-products/wavefronts/FirstWaveBound.shp",
   delete_dsn = T,
   delete_layer = T)
 
@@ -153,7 +156,10 @@ range(arealExpansion_w1)
 wave1char <- data.frame("Days before peak" = 63:1,
                         "Wave edge length" = waveEdge_w1,
                         "Areal wave expansion" = arealExpansion_w1)
-saveRDS(wave1char, file=here("Data/data-products/wave1-lengtharea.rds"), version=2)
+
+# saveRDS(wave1char, file=here("Data/data-products/wave1-lengtharea.rds"), version=2)
+write.csv(wave1char, file=here("Data/data-products/wavefronts/wave1Characteristics.csv"))
+
 
 #### Calculate the weekly speed as well to confirm that the mean summary 
 #### not particularly sensitive to time 
@@ -177,14 +183,14 @@ distanceToFront.df_w1 <- bind_rows(distanceToFrontier_w1) |>
 
 ## Saving as shapefile
 sf::st_write(obj = distanceToFront.df_w1,
-dsn = "Data/data-products/boundaryPlots/firstWaveModel/firstDistanceToFront.shp",
+dsn = "Data/data-products/wavefronts/firstDistanceToFront.shp",
 delete_dsn = T,
 delete_layer = T)
 
 ### Read in the distance data ### 
 # distanceToFrontier_w1 <- readRDS(here("Data/data-products/wavefronts/distanceToFrontier_firstWave.rds"))
 
-for(i in 1:63){
+for(i in 43:63){
   date <- unique(distanceToFrontier_w1[[i]]$date)
   plotDistFront <- ggplot() + 
     geom_sf(data=hexgrid, mapping=aes(geometry= geometry), fill="grey80") +
@@ -227,8 +233,12 @@ image_write(image = distFrontAnimated_w1,
             path = here::here("figures/wavefronts/firstWave/distFront-singleScale/distFrontSingleAnimated.gif"))
 
 ###############################################################################
-###########################     second WAVE      ###############################
 ###############################################################################
+###########################     second WAVE      ##############################
+###############################################################################
+###############################################################################
+
+
 boundList_w2 <- list()
 for(i in -63:0){
   date <- second_peak + i 
@@ -246,9 +256,6 @@ for(i in -63:0){
 saveRDS(boundList_w2, file = here("Data/data-products/wavefronts/boundaryData_secondWave.rds"), version = 2)
 # boundList_w2 <- readRDS(here("Data/data-products/wavefronts/boundaryData_secondWave.rds"))
 
-nrow(boundList_w2[[1]][[1]])*1100
-nrow(boundList_w2[[64]][[1]])*1100
-
 ## Saving as a .shp
 waveList_w2 <- list()
 for (i in 1:64) {
@@ -259,9 +266,12 @@ wave2.df <- bind_rows(waveList_w2)
 
 ## Writting the object as .shp
 sf::st_write(obj = wave2.df,
-  dsn = "Data/data-products/SecondWaveBound.shp",
+  dsn = "Data/data-products/wavefronts/SecondWaveBound.shp",
   delete_dsn = T,
   delete_layer = T)
+
+nrow(boundList_w2[[1]][[1]])*1100
+nrow(boundList_w2[[64]][[1]])*1100
 
 ## calculate growth of wave front 
 growth_w2 <- vector()
@@ -311,7 +321,9 @@ range(arealExpansion_w2)
 wave2char <- data.frame("Days before peak" = 63:1,
                         "Wave edge length" = waveEdge_w2,
                         "Areal wave expansion" = arealExpansion_w2)
-saveRDS(wave2char, file=here("Data/data-products/wave2-lengtharea.rds"), version=2)
+# saveRDS(wave2char, file=here("Data/data-products/wave2-lengtharea.rds"), version=2)
+write.csv(wave2char, file=here("Data/data-products/wavefronts/wave2Characteristics.csv"))
+
 #                         "Median speed per day" = , 
 #                         "Mean speed per day" = , 
 #                         "Length of wave greater than median max" = )
@@ -328,7 +340,20 @@ for (i in 8:length(boundList_w2)){
 
 ### Save for future use ### 
 saveRDS(distanceToFrontier_w2, here("Data/data-products/wavefronts/distanceToFrontier_secondWave.rds"), version = 2)
-saveRDS(distanceToFrontier_w2_weekly, here("Data/data-products/wavefronts/distanceToFrontier_secondWaveWkly.rds"), version = 2)
+# distanceToFrontier_w2 <- readRDS(here("Data/data-products/wavefronts/distanceToFrontier_secondWave.rds"))
+
+# saveRDS(distanceToFrontier_w2_weekly, here("Data/data-products/wavefronts/distanceToFrontier_secondWaveWkly.rds"), version = 2)
+
+
+## Creating a data.frame for the distance to the front
+distanceToFront.df_w2 <- bind_rows(distanceToFrontier_w2) |> 
+  mutate(date = as.Date(date))
+
+## Saving as shapefile
+sf::st_write(obj = distanceToFront.df_w2,
+             dsn = "Data/data-products/wavefronts/secondDistanceToFront.shp",
+             delete_dsn = T,
+             delete_layer = T)
 
 ###############################################################################
 ########### CALCULATE AND PLOT DISTANCE TO NEAREST POINT ######################

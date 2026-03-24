@@ -64,6 +64,10 @@ populationFull <- population %>%
   full_join(populationCnty) %>%
   mutate(frcCountyPop = population/countyPop)
 
+#### Save the hexbased population data 
+write.csv(populationFull %>% st_drop_geometry(), 
+          file=here("Data/data-products/geo-hexes/pop/hexgrid_intersection_pop.csv"))
+
 ##### covidestim observations allocated across counties |
 ##### this will be used to populate the hexgrid with infections |
 observationsFips <- st_read("Data/data-products/observations_preomicron.shp") %>% 
