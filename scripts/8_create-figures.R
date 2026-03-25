@@ -452,75 +452,81 @@ ggsave(plot = fig1,
 ##### the simple time trend of infections. 
 
 ##### Panel A: Time trend of infections daily 
-fig2a <- ggplot()+
-        geom_line(data = infections_daily_cum,
-                  aes(x = date, 
-                      y = sum_infectionsPC))+
-        theme_minimal()+
-        scale_x_date(name = "Date",
-                     date_breaks = "4 months",
-                     date_labels = "%b %y'",
-                     limits = c(as.Date("2020-02-01"), 
-                                as.Date("2021-11-01")))+
-        scale_y_continuous(name = "Estimated infection per 100,000 persons/day",
-                           labels = scales::label_comma())+
-        ## Alpha wave marks
-        annotate("rect",
-                 xmin = alpha_peak - 70,
-                 xmax = alpha_peak + 7,
-                 ymin = 0, ymax = Inf,
-                 fill = "grey50",alpha = 0.2)+
-        annotate("text",
-                 x = c(alpha_peak-63,
-                       alpha_peak-45,
-                       alpha_peak-24,
-                       alpha_peak),
-                 y = rep(2e6, 4),
-                 label = LETTERS[2:5],
-                 size = 8)+
-        annotate("segment",
-                 y = c(0.45e6,0.65e6,1.125e6,1.65e6),
-                 yend = rep(2e6,4),
-                 x = c(alpha_peak-63,
-                       alpha_peak-45,
-                       alpha_peak-24,
-                       alpha_peak),
-                 xend = c(alpha_peak-63,
-                          alpha_peak-45,
-                          alpha_peak-24,
-                          alpha_peak),
-                 color = "grey50",
-                 linetype = "dashed")+
-        ## Delta wave marks
-        annotate("rect",
-                 xmin = delta_peak - 70,
-                 xmax = delta_peak + 7,
-                 ymin = 0, ymax = Inf,
-                 fill = "grey50",alpha = 0.2) +
-        annotate("text",
-                 x = c(delta_peak-63,
-                       delta_peak-45,
-                       delta_peak-24,
-                       delta_peak),
-                 y = rep(0, 4),
-                 label = LETTERS[6:9],
-                 size = 8)+
-        annotate("segment",
-                 y = rep(1e4,4),
-                 yend = c(0.23e6,0.48e6,1.25e6,1.65e6),
-                 x = c(delta_peak-63,
-                       delta_peak-45,
-                       delta_peak-24,
-                       delta_peak),
-                 xend = c(delta_peak-63,
-                          delta_peak-45,
-                          delta_peak-24,
-                          delta_peak),
-                 color = "grey50",
-                 linetype = "dashed"); fig2a
+annotationValues <- infections_daily_cum %>% 
+  filter(date %in% c(alpha_peak-c(63,42,21,0),
+                     delta_peak-c(63,42,21,0))) %>% 
+  select(average_infectionsPC) %>% unlist() %>% as.vector()
+
+fig2a <- 
+  ggplot()+
+  geom_line(data = infections_daily_cum,
+            aes(x = date, 
+                y = average_infectionsPC))+
+  theme_minimal()+
+  scale_x_date(name = "Date",
+               date_breaks = "4 months",
+               date_labels = "%b %y'",
+               limits = c(as.Date("2020-02-01"), 
+                          as.Date("2021-11-01")))+
+  scale_y_continuous(name = "Average daily infections per 100,000 persons",
+                     labels = scales::label_comma())+
+  ## Alpha wave marks
+  annotate("rect",
+           xmin = alpha_peak - 70,
+           xmax = alpha_peak + 7,
+           ymin = 0, ymax = Inf,
+           fill = "grey50",alpha = 0.2)+
+  annotate("text",
+           x = c(alpha_peak-63,
+                 alpha_peak-42,
+                 alpha_peak-21,
+                 alpha_peak),
+           y = rep(250, 4),
+           label = LETTERS[2:5],
+           size = 8)+
+  annotate("segment",
+           y = annotationValues[1:4],
+           yend = rep(245,4),
+           x = c(alpha_peak-63,
+                 alpha_peak-45,
+                 alpha_peak-24,
+                 alpha_peak),
+           xend = c(alpha_peak-63,
+                    alpha_peak-45,
+                    alpha_peak-24,
+                    alpha_peak),
+           color = "grey50",
+           linetype = "dashed")+
+  ## Delta wave marks
+  annotate("rect",
+           xmin = delta_peak - 70,
+           xmax = delta_peak + 7,
+           ymin = 0, ymax = Inf,
+           fill = "grey50",alpha = 0.2) +
+  annotate("text",
+           x = c(delta_peak-63,
+                 delta_peak-42,
+                 delta_peak-21,
+                 delta_peak),
+           y = rep(0, 4),
+           label = LETTERS[6:9],
+           size = 8)+
+  annotate("segment",
+           y = annotationValues[5:8],
+           yend = rep(5,4),
+           x = c(delta_peak-63,
+                 delta_peak-42,
+                 delta_peak-21,
+                 delta_peak),
+           xend = c(delta_peak-63,
+                    delta_peak-42,
+                    delta_peak-21,
+                    delta_peak),
+           color = "grey50",
+           linetype = "dashed"); fig2a
 
 ##### Save Figure 2A 
-ggsave(filename = "Figures/extra_figures/fig2a_new.png",
+ggsave(filename = "figures/extra_figures/fig2a_newscale.png",
        plot = fig2a,
        width = 16,
        height =9, 
