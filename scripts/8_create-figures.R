@@ -47,16 +47,7 @@ us_states <- tigris::states(cb = T) |>
   st_transform(crs = 5070)
 
 #####  Population data  ########################################################
-hexpop <- vroom::vroom("Data/data-products/geo-hexes/pop/hexgrid_1100_km_meta_pop.csv") |> 
-  mutate(hexid = as.character(hexid)) |> 
-  left_join(hexgrid) |> 
-  st_as_sf()
-
-## hexes to county columns
-hexes_to_county <- vroom::vroom("Data/data-sources/hexid-fips-map.csv") |> mutate(hexid = as.character(hexid))
-
-hexpop <- hexpop |> 
-  left_join(hexes_to_county |> select(hexid, fips)) |> 
+hexpop <- st_read("Data/data-products/geo-hexes/pop/hexgrid_1100_km_intersection_meta_pop.shp") %>%
   mutate(STATEFP = str_sub(fips, 1, 2))
 
 #####  Infection data  ########################################################

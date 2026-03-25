@@ -39,12 +39,23 @@ population <- st_read(here("Data/data-products/geo-hexes/pop/interhex_pop_update
 populationHexTotal <- population %>%
   st_drop_geometry() %>%
   reframe(population = sum(population, na.rm = TRUE),
+          fips=fips,
           .by="hexid")
 
-# ggplot() + geom_sf(data=populationHexTotal %>% 
+### Save the population file 
+sf::st_write(obj = populationHexTotal %>% 
+                   left_join(st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp")),
+             dsn = "Data/data-products/geo-hexes/pop/hexgrid_1100_km_intersection_meta_pop.shp",
+             delete_dsn = T,
+             delete_layer = T)
+
+# write.csv(populationHexTotal, 
+#           "Data/data-products/geo-hexes/pop/hexgrid_1100_km_intersection_meta_pop.csv")
+
+# ggplot() + geom_sf(data=populationHexTotal %>%
 #                      left_join(hexgrid), aes(fill = population, geometry = geometry)) +
 #            geom_sf(data=populationHexTotal %>%
-#               left_join(hexgrid) %>% filter(population ==0), 
+#               left_join(hexgrid) %>% filter(population ==0),
 #               aes(geometry = geometry), fill="green")
 
 
