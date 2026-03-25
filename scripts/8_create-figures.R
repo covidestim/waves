@@ -47,12 +47,17 @@ us_states <- tigris::states(cb = T) |>
   st_transform(crs = 5070)
 
 #####  Population data  ########################################################
-####### Previously read in the old non-intersection polygons data 
-hexpop <- vroom::vroom("Data/data-products/geo-hexes/pop/hexgrid_intersection_pop.csv") %>%
-          select(hexid, population, fips) %>%
-          mutate(hexid = as.character(hexid)) %>%
-          left_join(hexgrid) %>% 
-          st_as_sf()
+hexpop <- vroom::vroom("Data/data-products/geo-hexes/pop/hexgrid_1100_km_meta_pop.csv") |> 
+  mutate(hexid = as.character(hexid)) |> 
+  left_join(hexgrid) |> 
+  st_as_sf()
+
+## hexes to county columns
+hexes_to_county <- vroom::vroom("Data/data-sources/hexid-fips-map.csv") |> mutate(hexid = as.character(hexid))
+
+hexpop <- hexpop |> 
+  left_join(hexes_to_county |> select(hexid, fips)) |> 
+  mutate(STATEFP = str_sub(fips, 1, 2))
 
 #####  Infection data  ########################################################
 ## Allocated across the hexgrid by date 
@@ -181,7 +186,6 @@ ggsave(plot = us_hex_plt,
 
 ### CT, ME, MA, NH,, RI, VT
 new_england_hexpop <- hexpop  %>% 
-  mutate(STATEFP = str_sub(fips, 1, 2)) %>%
   filter(STATEFP %in% c("09","23","25","33","44","50"))
 
 ### CT, ME, MA, NH,, RI, VT
@@ -192,7 +196,7 @@ new_england_states <- us_states|>
 new_england_hex_plt <- ggplot()+
                        geom_sf(new_england_hexpop |>
                                 filter(!is.na(population), 
-                                       STATEFP == "33") |>
+                                       STATEFP %in% c("09","23","25","33","44","50")) |>
                                 st_transform(crs = 5070),
                               mapping=aes(fill= log10(population+1))) +
                        geom_sf(new_england_states,
@@ -222,7 +226,6 @@ ggsave(plot = new_england_hex_plt,
 
 ## Figure 1B: Population across Connecticut
 ct_hexpop <- hexpop  %>% 
-  mutate(STATEFP = str_sub(fips, 1, 2)) %>%
   filter(STATEFP %in% c("09"))
 
 ct_hex_plt <- ggplot()+
