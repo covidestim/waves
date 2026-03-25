@@ -1227,4 +1227,371 @@ ggsave(plot = fig4,
        height = 14,
        dpi = 300)
 
-##
+###############################################################################
+###### Sensitivity Analysis ###################################################
+###############################################################################
+color_option <- "inferno"
+figS2 <- ggplot(data = CAR_df_preomicron |> 
+                  filter(date %in% c(delta_peak, alpha_peak,
+                                     delta_peak-21, alpha_peak - 21,
+                                     delta_peak-42, alpha_peak - 42,
+                                     delta_peak-63, alpha_peak - 63)) |> 
+                  st_transform(crs=26915),
+                aes(fill = mean, 
+                    color = mean))+
+  geom_sf()+
+  geom_sf(data = us_states,
+          color = "black",
+          fill = "transparent")+
+  scale_fill_viridis_c(option = color_option,
+                       name = "Estimated Infections/100k",
+                       direction = -1
+  )+
+  scale_color_viridis_c(option = color_option,
+                        name = "Estimated Infections/1000/week",
+                        direction = -1
+  )+
+  theme_void()+
+  guides(color = "none")+
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1, "cm"))+
+  facet_wrap(.~date, nrow = 2); figS2
+
+ggsave(plot = figS2,
+       filename = "Figures/extra_figures/figS2.png",
+       width = 16, 
+       height = 9,
+       dpi = 100)
+
+ggsave(plot = figS2,
+       filename = "Figures/extra_figures/figS2.pdf",
+       width = 16, 
+       height = 9,
+       dpi = 300)
+
+## Breakdowns of each peaks
+breaks_plt <- c(0,seq(127,300, 20))
+labels_plt <- c("127< ",seq(127,280, 20), ' >300')
+limits_plt <- c(0,350)
+color_option <- "magma"
+na_color <- "grey70"
+
+figS3 <- ggplot(data = CAR_df_preomicron |> 
+                  filter(date %in% c(delta_peak, alpha_peak,
+                                     delta_peak-21, alpha_peak - 21,
+                                     delta_peak-42, alpha_peak - 42,
+                                     delta_peak-63, alpha_peak - 63)) |> 
+                  st_transform(crs=26915),
+                aes(fill = mean, 
+                    color = mean))+
+  geom_sf()+
+  geom_sf(data = us_states,
+          color = "black",
+          fill = "transparent")+
+  scale_fill_viridis_b(option = color_option,
+                       name = "Estimated Infections/100k",
+                       direction = -1,
+                       na.value = na_color,
+                       breaks = breaks_plt,
+                       labels = labels_plt,
+                       limits = limits_plt,
+  )+
+  scale_color_viridis_b(option = color_option,
+                        name = "Estimated Infections/1000/week",
+                        direction = -1,
+                        na.value = na_color,
+                        breaks = breaks_plt,
+                        labels = labels_plt,
+                        limits = limits_plt,
+  )+
+  theme_void()+
+  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+                           title.position = "top",
+                           title.hjust = 0.5),
+         color = "none")+
+  theme(legend.position = "bottom",
+        legend.title.position = "top",
+        legend.key.width = grid::unit(1, "cm"))+
+  facet_wrap(.~date, nrow = 2); figS3
+
+ggsave(plot = figS3,
+       filename = "Figures/extra_figures/figS3.png",
+       width = 16, 
+       height = 9,
+       dpi = 100)
+
+ggsave(plot = figS3,
+       filename = "Figures/extra_figures/figS3.pdf",
+       width = 16, 
+       height = 9,
+       dpi = 300)
+
+
+## Sensitivity Analys on threshold values for the risk surface
+## Fig2A - Layered depiction on transforming estimated infections on counties polygon on hexgrid
+
+figS2a <- ggplot(data = CAR_df_preomicron,
+                 aes(x = mean))+
+  geom_histogram(bins = 500)+
+  theme_minimal()+
+  # xlim(c(0,300))+
+  labs(x = expression("Random effects " *theta ~ "(Ai)"),
+       y = "Frequency")+
+  scale_y_continuous(labels = scales::label_comma())+
+  scale_x_continuous(breaks = scales::breaks_pretty(n = 10))
+figS2a
+
+ecdf_mean <- ecdf(CAR_df_preomicron$mean)
+ecdf_upper <- ecdf(CAR_df_preomicron$`0.975quant`)
+ecdf_lower <- ecdf(CAR_df_preomicron$`0.025quant`)
+# ecdf_median <- ecdf(CAR_df_preomicron$`0.5quant`)
+
+figS2b <- ggplot(data = CAR_df_preomicron,
+                 aes(x = mean, y = ecdf_mean(mean)))+
+  geom_line()+
+  geom_ribbon(aes(x = mean,
+                  ymin = ecdf_lower(`0.025quant`),
+                  ymax = ecdf_upper(`0.975quant`)))+
+  geom_vline(xintercept = 189, linetype = "dashed")+
+  theme_minimal()+
+  labs(x = expression("Random effects " *theta ~ "(Ai)"),
+       y = "Percentile")+
+  xlim(c(0, NA))
+figS2b
+
+figS2b <- ggplot(CAR_df_preomicron) +
+  # geom_histogram(aes(mean), bins = 500)+
+  stat_ecdf(aes(mean, color = "median"), geom = "line", pad = FALSE)+
+  stat_ecdf(aes(`0.025quant`, color = "lower"), geom = "step", pad = FALSE)+
+  stat_ecdf(aes(`0.975quant`, color = "upper"), geom = "step", pad = FALSE)+
+  geom_vline(xintercept = 189, linetype = "dashed")+
+  theme_minimal()+
+  labs(x = expression("Random effects " *theta ~ "(Ai)"),
+       y = "Percentile",
+       color = "")+
+  scale_y_continuous(labels = scales::label_number())+
+  scale_x_continuous(breaks = scales::breaks_pretty(n = 10))+
+  scale_color_manual(values = c("grey30", "black", "grey50"))+
+  xlim(c(0, NA))
+figS2b
+
+ggsave(filename = "Figures/extra_figures/figS1b.png",
+       plot = figS2b,
+       width = 16,
+       height = 9,
+       dpi = 300)
+
+
+figS2 <- (figS2a | figS2b)
+figS2
+
+ggsave(filename = "Figures/extra_figures/figS1.png",
+       plot = figS2,
+       width = 16, 
+       height = 9, 
+       dpi = 100)
+
+## Sensitivity Analys on threshold values for the risk surface
+## Fig2A - Layered depiction on transforming estimated infections on counties polygon on hexgrid
+
+## Threshold for filtering given the distribution, any value of trend that it 
+## is above the 3rd quartile of the trend distribution
+# threshold_mean <- quantile(CAR_df_preomicron$mean, probs = 0.90, na.rm = TRUE)
+
+## Set to 85 and 300 to produce a and b panels for figure S2
+# threshold_mean <- quantile(CAR_df_preomicron$mean, probs = 0.50, na.rm = TRUE)
+# threshold_mean <- quantile(CAR_df_preomicron$mean, probs = 0.99, na.rm = TRUE)
+
+
+## Threshold for filtering given the distribution, any value of trend that it is above the 3rd Quarter of the trend distribution
+threshold_mean <- quantile(CAR_df_preomicron$mean, prob=0.75, na.rm=TRUE)
+
+##### Wave 1 ##################################################################
+
+CAR_lag_alpha <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  dplyr::select(hexid, date, mean, sd, geometry) |>
+  st_as_sf() |> 
+  filter(date %in% seq.Date(from = alpha_peak-63,
+                            to = alpha_peak,
+                            length.out = 63))|> 
+  mutate(contour_surface = if_else(mean >= threshold_mean, date - (alpha_peak-63), NA))|> 
+  st_transform(crs = 5070)
+
+contour_alpha <- CAR_lag_alpha|> 
+  filter(!is.na(contour_surface)) |> 
+  group_by(contour_surface, date) |> 
+  summarise(geometry = st_union(geometry),
+            area = format(round(units::set_units(st_area(st_union(geometry)), 
+                                                 km^2),0), 
+                          big.mark = ",")) |> 
+  arrange(date)
+
+##### Wave 2 ##################################################################
+
+CAR_lag_delta <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  dplyr::select(hexid, date, mean, sd, geometry) |>
+  st_as_sf() |> 
+  filter(date %in% seq.Date(from = delta_peak-63,
+                            to = delta_peak,
+                            length.out = 63))|> 
+  mutate(contour_surface = if_else(mean >= threshold_mean, date - (delta_peak-63), NA))|> 
+  st_transform(crs = 5070)
+
+contour_delta <- CAR_lag_delta|> 
+  filter(!is.na(contour_surface)) |> 
+  group_by(contour_surface, date) |> 
+  summarise(geometry = st_union(geometry),
+            area = format(round(units::set_units(st_area(st_union(geometry)), 
+                                                 km^2),0), 
+                          big.mark = ",")) |> 
+  arrange(date)
+
+## Speed distribution
+CAR_area_alpha <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  dplyr::select(hexid, date, mean, sd, geometry) |>
+  st_as_sf() |> 
+  filter(date %in% seq.Date(alpha_peak, (alpha_peak-63), length.out = 63))|> 
+  filter(mean >= threshold_mean) |> 
+  mutate(days = (alpha_peak - date))|> 
+  st_transform(crs = 5070) |> 
+  group_by(days) |> 
+  summarise(area = units::set_units(st_area(st_union(geometry)), km^2)) |> 
+  mutate(wave = "1st wave")
+
+## Speed and Velocity calculation
+## Alpha
+CAR_area_alpha$speed <- units::set_units(c(0, 
+                                           -diff(as.numeric(CAR_area_alpha$area))), km^2/day)
+
+## Velocity
+CAR_velocity_alpha <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  dplyr::select(hexid, date, mean, sd, geometry) |>
+  st_as_sf() |> 
+  filter(date %in% seq.Date(alpha_peak, (alpha_peak-63), length.out = 63))|> 
+  filter(mean >= threshold_mean) |> 
+  mutate(days = (alpha_peak - date))|> 
+  st_transform(crs = 5070) |> 
+  group_by(days) |> 
+  summarise(area = units::set_units(st_area(st_union(geometry)), km^2)) |> 
+  mutate(geometry = st_centroid(geometry)) |> 
+  mutate(wave = "1st wave")
+
+CAR_area_alpha$velocity <- units::set_units(c(0, 
+                                              -diff(as.numeric(CAR_velocity_alpha$area))), km^2/day)
+
+CAR_velocity_alpha$velocity <- units::set_units(c(0, 
+                                                  -diff(as.numeric(CAR_velocity_alpha$area))), km^2/day)
+
+## Delta
+CAR_area_delta <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  dplyr::select(hexid, date, mean, sd, geometry) |>
+  st_as_sf() |> 
+  filter(date %in% seq.Date(delta_peak, (delta_peak-63), length.out = 63))|> 
+  filter(mean >= threshold_mean) |> 
+  mutate(days = (delta_peak - date))|> 
+  st_transform(crs = 5070) |> 
+  group_by(days) |> 
+  summarise(area = units::set_units(st_area(st_union(geometry)), km^2)) |> 
+  mutate(wave = "2nd wave")
+
+## Speed/Velocity calculation
+CAR_area_delta$speed <- units::set_units(c(0, 
+                                           -diff(as.numeric(CAR_area_delta$area))), km^2/day)
+
+## Velocity
+CAR_velocity_delta <- CAR_df_preomicron |> 
+  mutate(hexid = as.character(hexid)) |> 
+  dplyr::select(hexid, date, mean, sd, geometry) |>
+  st_as_sf() |> 
+  filter(date %in% seq.Date(delta_peak, (delta_peak-63), length.out = 63))|> 
+  filter(mean >= threshold_mean) |> 
+  mutate(days = (delta_peak - date))|> 
+  st_transform(crs = 5070) |> 
+  group_by(days) |> 
+  summarise(area = units::set_units(st_area(st_union(geometry)), km^2)) |> 
+  mutate(geometry = st_centroid(geometry)) |> 
+  mutate(wave = "2nd wave")
+
+CAR_area_delta$velocity <- units::set_units(c(0, 
+                                              -diff(as.numeric(CAR_velocity_delta$area))), km^2/day)
+
+CAR_velocity_delta$velocity <- units::set_units(c(0, 
+                                                  -diff(as.numeric(CAR_velocity_delta$area))), km^2/day)
+## Speed distribution
+CAR_joined <- rbind(CAR_area_alpha, CAR_area_delta)
+
+fig4c <- ggplot()+
+  geom_col(data = CAR_joined,
+           aes(x = days, y = speed, fill = wave),
+           alpha = 0.75,
+           position = position_dodge())+
+  geom_vline(xintercept = 7, color = "grey80", lty = "dashed")+
+  geom_vline(xintercept = seq(7,63,7), lty = "dotted", color = "grey50")+
+  theme_minimal()+
+  labs(x = "Days before national curve peak", 
+       y = "Rate of areal expansion")+
+  scale_x_reverse(breaks = seq(7,63,7))+
+  units::scale_y_units(labels = scales::label_comma(),
+                       breaks = scales::breaks_extended(n = 10))+
+  colorspace::scale_fill_discrete_divergingx(name = "")+
+  theme(legend.position = "bottom",
+        legend.title = element_text(hjust = 0.5),
+        axis.text = element_text(size = 12)) + 
+  ggtitle("Rate of areal expansion")
+fig4c
+
+ggsave(filename = here("figures/fig3.png"),
+       plot = fig4c,
+       width = 16,
+       height = 9,
+       dpi = 200)
+
+ggsave(filename = here("figures/fig3.pdf"),
+       plot = fig4c,
+       width = 16,
+       height = 9,
+       dpi = 200)
+
+## Making figure S2
+## After running the line 1063 to 1347 with threshold_mean set to 127 and 233, we
+figS2a <- fig4c
+figS2b <- fig4c
+
+figS2 <- (figS2a | figS2b)
+figS2
+
+ggsave(filename = "Figures/figS2.png",
+       plot = figS2,
+       width = 16, 
+       height = 9, 
+       dpi = 300)
+
+ggsave(filename = "Figures/figS2.pdf",
+       plot = figS2,
+       width = 16, 
+       height = 9, 
+       dpi = 300)
+
+# ## Final Layered figure
+# fig4_layered <- ((fig4a_layered / fig4b_layered)| fig4c)+
+#   # plot_layout(guides = "keep")&
+#   theme(legend.position = "bottom")
+# fig4_layered
+
+# ggsave(filename = "Figures/extra_figures/fig4_layered.png",
+#        plot = fig4_layered,
+#        width = 16, 
+#        height = 9, 
+#        dpi = 100)
+
+# ggsave(filename = "Figures/extra_figures/fig4_layered.pdf",
+#        plot = fig4_layered,
+#        width = 16, 
+#        height = 9, 
+#        dpi = 300)
