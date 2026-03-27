@@ -69,7 +69,8 @@ hexgrid_preomicron <- vroom::vroom("Data/data-products/geo-hexes/hexid-observati
 ## Cumulative infections across for each date (For figure 2A)
 infections_daily_cum <- hexgrid_preomicron %>%
   group_by(date) |> 
-  summarise(sum_infectionsPC = sum(infectionsPC, na.rm = T)) |> 
+  summarise(sum_infectionsPC = sum(infectionsPC, na.rm = T), 
+            average_infectionsPC = sum(infectionsPC, na.rm = T)/nrow(hexgrid)*1e5) |> 
   st_drop_geometry()
 
 ## Cumulative infections across all dates for each hex
@@ -467,7 +468,7 @@ fig2a <-
                  alpha_peak),
            y = rep(250, 4),
            label = LETTERS[2:5],
-           size = 8)+
+           size = 7)+
   annotate("segment",
            y = annotationValues[1:4],
            yend = rep(245,4),
@@ -494,7 +495,7 @@ fig2a <-
                  delta_peak),
            y = rep(0, 4),
            label = LETTERS[6:9],
-           size = 8)+
+           size = 7)+
   annotate("segment",
            y = annotationValues[5:8],
            yend = rep(5,4),
@@ -510,7 +511,7 @@ fig2a <-
            linetype = "dashed"); fig2a
 
 ##### Save Figure 2A 
-ggsave(filename = "figures/extra_figures/fig2a_newscale.png",
+ggsave(filename = "figures/extra_figures/fig2a.png",
        plot = fig2a,
        width = 16,
        height =9, 
@@ -563,7 +564,7 @@ fig2.b <- ggplot()+
 
 ## Save Figure 2B
 ggsave(plot = fig2.b,
-       filename = "Figures/extra_figures/fig2_b_new.png",
+       filename = "Figures/extra_figures/fig2_b.png",
        width = 16,
        height = 9, 
        dpi = 200)
@@ -643,7 +644,7 @@ fig2.d <- ggplot()+
 
 ## Save Figure 2D
 ggsave(plot = fig2.d,
-       filename = "Figures/extra_figures/fig2_d_new.png",
+       filename = "Figures/extra_figures/fig2_d.png",
        width = 16,
        height = 9, 
        dpi = 200)
@@ -904,7 +905,7 @@ ggsave(plot = fig2,
        dpi = 300)
 
 ggsave(plot = fig2,
-       filename = "Figures/fig2.pdf",
+       filename = "Figures/fig2.tiff",
        width = 16, 
        height = 9,
        dpi = 300)
