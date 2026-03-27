@@ -324,7 +324,7 @@ for (i in 1:length(distanceToFrontier_firstWave)){
   firstWaveBoundLengthMax[i] <- sum(st_length(st_filter(boundList_w1[[i]][["boundary"]] %>% 
                                                           select(hexid, date, infectionsPC, mean, geometry), hexesFirst)))/1000
   hexesSecond <- distanceToFrontier_secondWave[[i]] %>% filter(distToFront >= secondWaveMaxMedian) %>% select(geometry)
-  secondWaveBoundLengthMax[i] <- sum(st_length(st_filter(boundList2[[i]][["boundary"]], hexesSecond)))/1000
+  secondWaveBoundLengthMax[i] <- sum(st_length(st_filter(boundList_w2[[i]][["boundary"]], hexesSecond)))/1000
 }
 
 allWave1char <- data.frame(wave1char, 
