@@ -107,9 +107,11 @@ distanceToFront.df_second <- sf::st_read("Data/data-products/wavefronts/secondDi
   rename(distToFront = dstTFrn) %>% st_transform(crs=5070)
 
 wave1Stats <- vroom::vroom("Data/data-products/wavefronts/wave1Characteristics.csv") |> 
+  select(!"...1") %>%
   mutate(wave = "1st")
 
 wave2Stats <- vroom::vroom("Data/data-products/wavefronts/wave2Characteristics.csv") |> 
+  select(!"...1") %>%
   mutate(wave = "2nd")
 
 waveStatsJoined <- rbind(wave1Stats, wave2Stats) %>%
@@ -939,7 +941,7 @@ fig3a <- ggplot()+
           ggtitle("Areal expansion rate"); fig3a
 
 ### Save figure 3A
-ggsave(plot = fig3a, filename = here("figures/fig3a.tif"), 
+ggsave(plot = fig3a, filename = here("figures/extra_figures/fig3a.png"), 
        width = 16, height = 9, dpi = 300)
 
 ##### Figure 3B: Wave front speed compared between wave 1 and wave 2
@@ -964,14 +966,14 @@ fig3b <- ggplot()+
           ggtitle("Wavefront speed"); fig3b
 
 ### Save figure 3B
-ggsave(plot = fig3b, filename = here("figures/fig3b.tif"), 
+ggsave(plot = fig3b, filename = here("figures/extra_figures/fig3b.png"), 
        width = 16, height = 9, dpi = 300)
 
 ## Save the two panels together as Figure 3
 ggsave( plot = (fig3a+fig3b) + plot_layout(nrow=2, guides = "collect") & 
         theme(legend.position = 'bottom',
               legend.direction = 'horizontal'), 
-        filename = here("figures/fig3.tif"),
+        filename = here("figures/fig3.tiff"),
         width = 8.5, height = 11, dpi = 300) 
 
 ###############################################################################

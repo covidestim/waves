@@ -36,6 +36,14 @@ distanceToFrontier_firstWave <- readRDS(here("Data/data-products/wavefronts/dist
 ### Read in the second peak speeds 
 distanceToFrontier_secondWave <- readRDS(here("Data/data-products/wavefronts/distanceToFrontier_secondWave.rds"))
 
+
+### Read in the first wave bounds 
+boundList_w1 <- readRDS(here("Data/data-products/wavefronts/boundaryData_firstWave.rds"))
+
+### Read in the second wave bounds
+boundList_w2 <- readRDS(here("Data/data-products/wavefronts/boundaryData_secondWave.rds"))
+
+
 ### Overall means and median speeds for each wave
 ### Wave 1 
 mean(bind_rows(distanceToFrontier_firstWave)$distToFront/1e3) #km/day
@@ -334,8 +342,8 @@ colnames(allWave1char)[4:6] <- c("median.speed",
                                  "mean.speed", 
                                  "length greater than max")
 
-write.csv(allWave1char, here("Data/data-products/wave1Characteristics.csv"))
-write.csv(allWave2char, here("Data/data-products/wave2Characteristics.csv"))
+write.csv(allWave1char, here("Data/data-products/wavefronts/wave1Characteristics.csv"))
+write.csv(allWave2char, here("Data/data-products/wavefronts/wave2Characteristics.csv"))
 
 # max(firstWaveBoundLengthMax); 63-which(firstWaveBoundLengthMax == max(firstWaveBoundLengthMax))
 # max(secondWaveBoundLengthMax); 63-which(secondWaveBoundLengthMax == max(secondWaveBoundLengthMax))

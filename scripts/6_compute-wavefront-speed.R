@@ -157,8 +157,8 @@ wave1char <- data.frame("Days before peak" = 63:1,
                         "Wave edge length" = waveEdge_w1,
                         "Areal wave expansion" = arealExpansion_w1)
 
-# saveRDS(wave1char, file=here("Data/data-products/wave1-lengtharea.rds"), version=2)
-write.csv(wave1char, file=here("Data/data-products/wavefronts/wave1Characteristics.csv"))
+saveRDS(wave1char, file=here("Data/data-products/wave1-lengtharea.rds"), version=2)
+# write.csv(wave1char, file=here("Data/data-products/wavefronts/wave1Characteristics.csv"))
 
 
 #### Calculate the weekly speed as well to confirm that the mean summary 
@@ -321,12 +321,8 @@ range(arealExpansion_w2)
 wave2char <- data.frame("Days before peak" = 63:1,
                         "Wave edge length" = waveEdge_w2,
                         "Areal wave expansion" = arealExpansion_w2)
-# saveRDS(wave2char, file=here("Data/data-products/wave2-lengtharea.rds"), version=2)
-write.csv(wave2char, file=here("Data/data-products/wavefronts/wave2Characteristics.csv"))
+saveRDS(wave2char, file=here("Data/data-products/wave2-lengtharea.rds"), version=2)
 
-#                         "Median speed per day" = , 
-#                         "Mean speed per day" = , 
-#                         "Length of wave greater than median max" = )
 
 #### Calculate the weekly speed as well to confirm that the mean summary 
 #### not particularly sensitive to time 
