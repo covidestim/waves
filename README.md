@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.1371/journal.pcbi.1013983.svg)](https://doi.org/10.1371/journal.pcbi.1013983)
 
-This repo stores code and data to reproduce the analysis in the manuscript, "Quantifying the spatiotemporal dynamics of the first two epidemic waves of SARS-CoV-2 infections in the United States", currently under review at PLOS Computational Biology.
+This repo stores code and data to reproduce the analysis in the manuscript, "Quantifying the spatiotemporal dynamics of the first two epidemic waves of SARS-CoV-2 infections in the United States", published in PLOS Computational Biology.
 
 ## Project description 
 
