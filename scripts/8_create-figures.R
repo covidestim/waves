@@ -1209,13 +1209,19 @@ fig4 <- (((fig4a / fig4b / fig4c / fig4d)) |
   plot_layout(guides = "collect"); fig4
 
 ggsave(plot = fig4,
-       filename = "figures/fig4_no_center.png",
+       filename = "figures/fig4.png",
        width = 9,
        height = 14,
        dpi = 300)
 
 ggsave(plot = fig4,
-       filename = "figures/fig4_no_center.pdf",
+       filename = "figures/fig4.pdf",
+       width = 9,
+       height = 14,
+       dpi = 300)
+
+ggsave(plot = fig4,
+       filename = "figures/fig4.tiff",
        width = 9,
        height = 14,
        dpi = 300)
