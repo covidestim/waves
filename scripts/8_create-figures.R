@@ -47,8 +47,7 @@ us_states <- tigris::states(cb = T) |>
   st_transform(crs = 5070)
 
 #####  Population data  ########################################################
-hexpop <- st_read("Data/data-products/geo-hexes/pop/hexgrid_1100_km_intersection_meta_pop.shp") %>%
-  mutate(STATEFP = str_sub(fips, 1, 2))
+hexpop <- st_read("Data/data-products/geo-hexes/pop/hexgrid_1100_km_meta_pop.shp")
 
 #####  Infection data  ########################################################
 ## Allocated across the hexgrid by date 
@@ -79,7 +78,7 @@ hexgrid_preomicron_cum <- hexgrid_preomicron %>%
   summarise(cum_infections = sum(infections, na.rm = T)) |> 
   right_join(hexpop |>  
                mutate(hexid = as.character(hexid)) |> 
-               select(hexid, population, geometry, fips))  |> 
+               select(hexid, population))  |> 
   mutate(cum_infectionsPC = cum_infections/population) |> 
   sf::st_as_sf() |> 
   st_transform(crs = 5070)|>
@@ -176,19 +175,16 @@ ggsave(plot = us_hex_plt,
 
 
 ### CT, ME, MA, NH,, RI, VT
-new_england_hexpop <- hexpop  %>% 
-  filter(STATEFP %in% c("09","23","25","33","44","50"))
+new_england_hexpop <- st_filter(hexpop, new_england_states)
 
-### CT, ME, MA, NH,, RI, VT
 new_england_states <- us_states|> 
   filter(STATEFP %in% c("09","23","25","33","44","50"))
 
 ## Figure 1B: Population across New England states
 new_england_hex_plt <- ggplot()+
-                       geom_sf(new_england_hexpop |>
-                                filter(!is.na(population), 
-                                       STATEFP %in% c("09","23","25","33","44","50")) |>
-                                st_transform(crs = 5070),
+                       geom_sf(new_england_hexpop |> 
+                                 filter(!is.na(population)) |> 
+                                 st_transform(crs = 5070),
                               mapping=aes(fill= log10(population+1))) +
                        geom_sf(new_england_states,
                               mapping=aes(),
@@ -210,14 +206,13 @@ new_england_hex_plt <- ggplot()+
 
 ## Save Figure 1B
 ggsave(plot = new_england_hex_plt,
-       filename = "Figures/extra_figures/fig1b_new.2png",
+       filename = "Figures/extra_figures/fig1b_new.png",
        width = 16, 
        height = 9, 
        dpi = 100)
 
 ## Figure 1B: Population across Connecticut
-ct_hexpop <- hexpop  %>% 
-  filter(STATEFP %in% c("09"))
+ct_hexpop <- st_filter(hexpop, ct_counties)
 
 ct_hex_plt <- ggplot()+
   geom_sf(ct_hexpop |> 
@@ -270,15 +265,6 @@ ggsave(plot = hexpop_zoom,
        height = 9,
        dpi = 100)
 
-## hexes to county columns
-hexes_to_county <- vroom::vroom("Data/data-sources/hexid-fips-map.csv") |> 
-                   mutate(hexid = as.character(hexid))
-
-hexgrid_preomicron_cum <- hexgrid_preomicron_cum |> 
-  left_join(hexes_to_county |> select(hexid, fips) |> mutate(hexid = as.character(hexid))) |> 
-  mutate(STATEFP = as.character(substr(fips, 1, 2)))
-
-color_option <- "inferno"
 
 ##### United States Infections ################################################
 us_hex_infections <- ggplot() +
@@ -311,59 +297,59 @@ us_hex_infections <- ggplot() +
                             legend.key.width = grid::unit(3, "cm"),
                             axis.text = element_text(size = 6)); us_hex_infections
 ## Save figure 1D 
-ggsave(filename = "Figures/extra_figures/fig1d.png", 
+ggsave(filename = "Figures/extra_figures/fig1d_new.png", 
        plot = us_hex_infections,
        width = 16,
        height = 9, 
        dpi = 100)
 
 ##### New England Infections ##################################################
-# Filter the infections based on state FIPS codes 
-new_england_grid_infections <- hexgrid_preomicron_cum %>%
-  mutate(STATEFP = str_sub(fips, 1, 2)) %>%
-  filter(STATEFP %in% c("09","23","25","33","44","50"))
+new_england_grid_infections <- st_filter(hexgrid_preomicron_cum, new_england_states)
+
+new_england_hexes <- st_filter(hexgrid, new_england_states)
 
 new_england_hex_infections <- ggplot() + 
-                              geom_sf(new_england_grid_infections|> 
-                                        filter(population > 0)|> ## uncomment if you wanna check the flatten figures
-                                        st_transform(crs = 5070), 
-                                      mapping=aes(fill = log10(cum_infections+1))) +
-                              geom_sf(new_england_grid_infections|> 
-                                        filter(population == 0)|> ## uncomment if you wanna check the flatten figures
-                                        st_transform(crs = 5070), 
-                                      mapping=aes(),
-                                      fill = "grey50") +
-                              geom_sf(new_england_states,
-                                      mapping=aes(),
-                                      color = "black",
-                                      fill = "transparent")+
-                              scale_fill_viridis_c(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
-                                                   option = "inferno",
-                                                   direction = -1,
-                                                   na.value = "grey80",
-                                                   # rev = T,
-                                                   breaks = seq(0,7,1),
-                                                   labels = scales::label_math(),
-                                                   limits = c(0,7)
-                              )+
-                              theme_minimal()+
-                              theme(legend.position = "none", 
-                                    legend.title.position = "top",
-                                    legend.title = element_text(hjust = 0.5),
-                                    legend.key.width = grid::unit(3, "cm"),
-                                    axis.text = element_text(size = 6)); new_england_hex_infections
+  geom_sf(new_england_grid_infections|> 
+            filter(population > 0)|> ## uncomment if you wanna check the flatten figures
+            st_transform(crs = 5070), 
+          mapping=aes(fill = log10(cum_infections+1))) +
+  geom_sf(new_england_grid_infections|> 
+            filter(population == 0)|> ## uncomment if you wanna check the flatten figures
+            st_transform(crs = 5070), 
+          mapping=aes(),
+          fill = "grey50") +
+  geom_sf(new_england_states,
+          mapping=aes(),
+          color = "black",
+          fill = "transparent")+
+  scale_fill_viridis_c(name = "Cumulative Infections (log10 scale) \n (March 2020 - December 2021)",
+                       option = "inferno",
+                       direction = -1,
+                       na.value = "grey80",
+                       # rev = T,
+                       breaks = seq(0,7,1),
+                       labels = scales::label_math(),
+                       limits = c(0,7)
+  )+
+  theme_minimal()+
+  theme(legend.position = "none", 
+        legend.title.position = "top",
+        legend.title = element_text(hjust = 0.5),
+        legend.key.width = grid::unit(3, "cm"),
+        axis.text = element_text(size = 6)); new_england_hex_infections
+
+## Save figure 1#
+ggsave(filename = "Figures/extra_figures/fig1e_new.png", 
+       plot = new_england_hex_infections,
+       width = 16,
+       height = 9, 
+       dpi = 100)
 
 ###### Connecticut infections #################################################
 
-ct_grid_infection <- hexgrid_preomicron_cum %>%
-  mutate(STATEFP = str_sub(fips, 1, 2)) %>%
-  filter(STATEFP == "09")
+ct_grid_infection <- st_filter(hexgrid_preomicron_cum, ct_counties)
 
-ct_hexes <- hexgrid |> 
-            mutate(hexid = as.character(hexid)) |> 
-            left_join(hexes_to_county |> select(hexid, fips) |> mutate(hexid = as.character(hexid))) |> 
-            mutate(STATEFP = str_sub(fips, 1, 2)) |> 
-            filter(STATEFP == "09")
+ct_hexes <- st_filter(hexgrid, ct_counties)
 
 ct_hex_infections <-  ggplot() + 
   geom_sf(ct_grid_infection|> 
@@ -393,14 +379,21 @@ ct_hex_infections <-  ggplot() +
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
         legend.key.width = grid::unit(3, "cm"),
-        axis.text = element_text(size = 6)); ct_hex_infections
+        axis.text = element_text(size = 6))
+ct_hex_infections
+
+ggsave(filename = "Figures/extra_figures/fig1f_new.png", 
+       plot = ct_hex_infections,
+       width = 16,
+       height = 9, 
+       dpi = 100)
 
 hex_infections <- (us_hex_infections | (new_england_hex_infections / ct_hex_infections))+
   plot_annotation(tag_levels = 'A')+
   plot_layout(widths = c(4,1,1),
               heights = c(4,1,1),
-              guides = 'keep'); hex_infections
-
+              guides = 'keep')
+hex_infections
 ggsave(plot = hex_infections,
        filename = "Figures/extra_figures/fig1_lower_new.pdf",
        width = 16,
