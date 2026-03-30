@@ -26,7 +26,7 @@ hexgrid <- st_read("Data/data-products/geo-hexes/hexgrid_1100_km.shp") |>
   st_transform(crs = 5070)
 
 ##### Population allocated across the interesections of counties and hexes |
-population <- st_read(here("Data/data-products/geo-hexes/pop/interhex_pop_updated.shp")) %>%
+population <- st_read(here::here("Data/data-products/geo-hexes/pop/interhex_pop_updated.shp")) %>%
   select(hexid_x, fips_x, sum_pop, geometry) %>%
   rename(population = sum_pop,
          hexid = hexid_x,
