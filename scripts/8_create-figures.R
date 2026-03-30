@@ -124,8 +124,8 @@ colnames(waveStatsJoined)[3] <- "Recruitment rate (km2/day)"
 colnames(waveStatsJoined)[5] <- "Mean speed (km/day)"
 
 ##### Wave boundaries #########################################################
-firstBound <- st_read(here("Data/data-products/wavefronts/FirstWaveBound.shp"))
-secondBound <- st_read(here("Data/data-products/wavefronts/SecondWaveBound.shp"))
+firstBound <- st_read(here::here("Data/data-products/wavefronts/FirstWaveBound.shp"))
+secondBound <- st_read(here::here("Data/data-products/wavefronts/SecondWaveBound.shp"))
 
 ###############################################################################
 ##### FIGURE 1 ################################################################
@@ -382,8 +382,7 @@ ct_hex_infections <-  ggplot() +
         legend.title.position = "top",
         legend.title = element_text(hjust = 0.5),
         legend.key.width = grid::unit(3, "cm"),
-        axis.text = element_text(size = 6))
-ct_hex_infections
+        axis.text = element_text(size = 6)); ct_hex_infections
 
 ggsave(filename = "Figures/extra_figures/fig1f_new.png", 
        plot = ct_hex_infections,
@@ -412,7 +411,7 @@ ggsave(plot = hex_infections,
 ###### Connect all the panels with patchwork ##################################
 fig1 <- (hexpop_zoom / hex_infections)+
   plot_annotation(tag_level = 'A')+
-  plot_layout(widths = c(3,1))&
+  plot_layout(widths = c(3,1))+
   theme(plot.tag = element_text(size = 18),
         axis.text = element_text(size = 4)); fig1
 
@@ -425,7 +424,7 @@ ggsave(plot = fig1,
 )
 
 ggsave(plot = fig1,
-       file = "Figures/fig1.tiff",
+       file = "Figures/fig1.tif",
        width = 9,
        height = 16,
        dpi = 300
@@ -907,7 +906,7 @@ ggsave(plot = fig2,
        dpi = 300)
 
 ggsave(plot = fig2,
-       filename = "Figures/fig2.tiff",
+       filename = "Figures/fig2.tif",
        width = 16, 
        height = 9,
        dpi = 300)
@@ -973,7 +972,7 @@ ggsave(plot = fig3b, filename = here("figures/extra_figures/fig3b.png"),
 ggsave( plot = (fig3a+fig3b) + plot_layout(nrow=2, guides = "collect") & 
         theme(legend.position = 'bottom',
               legend.direction = 'horizontal'), 
-        filename = here("figures/fig3.tiff"),
+        filename = here("figures/fig3.tif"),
         width = 8.5, height = 11, dpi = 300) 
 
 ###############################################################################
@@ -982,7 +981,7 @@ ggsave( plot = (fig3a+fig3b) + plot_layout(nrow=2, guides = "collect") &
 
 ##### FIRST WAVE ##############################################################
 
-## Figure 4A: Wave 1 at 63 prior to peak
+## Figure 4A: Wave 1 at 42 prior to peak
 date_displayed <- alpha_peak-42
 
 fig4a <- ggplot() + 
@@ -1004,13 +1003,13 @@ fig4a <- ggplot() +
                         # breaks=c(0, 50, 100, 200, 500, 1000, 1500),
                         breaks=c(0, 10, 25, 50, 100, 200, 400, 800),
                         name = "Distance to nearest point\non boundary at t+1\n(in km/day)") +
-  scale_fill_manual(values = c("grey80", "grey30"))+
+  scale_fill_manual(values = c("grey80", "grey50"))+
   guides(fill = guide_legend(override.aes = list(size = 5, shape = 17)))+
   theme_void()+
   labs(title = date_displayed); fig4a 
 
-## Figure 4B: Wave 1 at 42 prior to peak
-date_displayed <- "2020-10-22"
+## Figure 4B: Wave 1 at 28 prior to peak
+date_displayed <- alpha_peak - 28
 
 fig4b <- ggplot() + 
           geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
@@ -1037,8 +1036,8 @@ fig4b <- ggplot() +
           theme_void()+
           labs(title = date_displayed); fig4b
 
-## Figure 4C: Wave 1 at 21 prior to peak
-date_displayed <- "2020-11-05"
+## Figure 4C: Wave 1 at 14 prior to peak
+date_displayed <- alpha_peak - 14
 
 fig4c<- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
@@ -1065,8 +1064,8 @@ fig4c<- ggplot() +
   theme_void()+
   labs(title = date_displayed); fig4c
 
-## Figure 4D: Wave 1 at peak
-date_displayed <- "2020-11-17"
+## Figure 4D: Wave 1 2 days before peak, as in peak all COTUS is under the wave so speed of spreading is 0
+date_displayed <- alpha_peak - 2
 
 fig4d <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
@@ -1094,7 +1093,7 @@ fig4d <- ggplot() +
   labs(title = date_displayed); fig4d
 
 ## Second wave panels
-## Figure 4F: Wave 2 at 63 prior to peak
+## Figure 4F: Wave 2 at 42 prior to peak
 date_displayed <- delta_peak-42
 fig4e <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
@@ -1121,8 +1120,8 @@ fig4e <- ggplot() +
   theme_void()+
   labs(title = date_displayed); fig4e
 
-## Figure 4F: Wave 2 at 42 prior to peak
-date_displayed <- "2021-08-07"
+## Figure 4F: Wave 2 at 28 prior to peak
+date_displayed <- delta_peak - 28
 fig4f <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
   geom_sf(data=secondBound |> 
@@ -1149,7 +1148,7 @@ fig4f <- ggplot() +
   labs(title = date_displayed); fig4f
 
 ## Figure 4G: Wave 2 at 21 prior to peak
-date_displayed <- "2021-08-21"
+date_displayed <- delta_peak - 14
 fig4g <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
   geom_sf(data=secondBound |> 
@@ -1176,7 +1175,7 @@ fig4g <- ggplot() +
   labs(title = date_displayed); fig4g
 
 ## Figure 4H: Wave 2 at peak
-date_displayed <- "2021-09-02"
+date_displayed <- delta_peak - 2
 fig4h <- ggplot() + 
   geom_sf(data=hexgrid, mapping=aes(geometry= geometry, fill="Hex in a wave")) +
   geom_sf(data=secondBound |> 
@@ -1221,7 +1220,7 @@ ggsave(plot = fig4,
        dpi = 300)
 
 ggsave(plot = fig4,
-       filename = "figures/fig4.tiff",
+       filename = "figures/fig4.tif",
        width = 9,
        height = 14,
        dpi = 300)
@@ -1327,37 +1326,36 @@ ggsave(plot = figS3,
        dpi = 300)
 
 
-## Sensitivity Analys on threshold values for the risk surface
+## Sensitivity Analysis on threshold values for the risk surface
 ## Fig2A - Layered depiction on transforming estimated infections on counties polygon on hexgrid
-
-figS2a <- ggplot(data = CAR_df_preomicron,
-                 aes(x = mean))+
-  geom_histogram(bins = 500)+
-  theme_minimal()+
-  # xlim(c(0,300))+
-  labs(x = expression("Random effects " *theta ~ "(Ai)"),
-       y = "Frequency")+
-  scale_y_continuous(labels = scales::label_comma())+
-  scale_x_continuous(breaks = scales::breaks_pretty(n = 10))
-figS2a
+# figS2a <- ggplot(data = CAR_df_preomicron,
+#                  aes(x = mean))+
+#   geom_histogram(bins = 500)+
+#   theme_minimal()+
+#   # xlim(c(0,300))+
+#   labs(x = expression("Random effects " *theta ~ "(Ai)"),
+#        y = "Frequency")+
+#   scale_y_continuous(labels = scales::label_comma())+
+#   scale_x_continuous(breaks = scales::breaks_pretty(n = 10))
+# figS2a
 
 ecdf_mean <- ecdf(CAR_df_preomicron$mean)
 ecdf_upper <- ecdf(CAR_df_preomicron$`0.975quant`)
 ecdf_lower <- ecdf(CAR_df_preomicron$`0.025quant`)
 # ecdf_median <- ecdf(CAR_df_preomicron$`0.5quant`)
 
-figS2b <- ggplot(data = CAR_df_preomicron,
-                 aes(x = mean, y = ecdf_mean(mean)))+
-  geom_line()+
-  geom_ribbon(aes(x = mean,
-                  ymin = ecdf_lower(`0.025quant`),
-                  ymax = ecdf_upper(`0.975quant`)))+
-  geom_vline(xintercept = 189, linetype = "dashed")+
-  theme_minimal()+
-  labs(x = expression("Random effects " *theta ~ "(Ai)"),
-       y = "Percentile")+
-  xlim(c(0, NA))
-figS2b
+# figS2b <- ggplot(data = CAR_df_preomicron,
+#                  aes(x = mean, y = ecdf_mean(mean)))+
+#   geom_line()+
+#   geom_ribbon(aes(x = mean,
+#                   ymin = ecdf_lower(`0.025quant`),
+#                   ymax = ecdf_upper(`0.975quant`)))+
+#   geom_vline(xintercept = 189, linetype = "dashed")+
+#   theme_minimal()+
+#   labs(x = expression("Random effects " *theta ~ "(Ai)"),
+#        y = "Percentile")+
+#   xlim(c(0, NA))
+# figS2b
 
 figS2b <- ggplot(CAR_df_preomicron) +
   # geom_histogram(aes(mean), bins = 500)+
