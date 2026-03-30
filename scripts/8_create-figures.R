@@ -559,7 +559,7 @@ fig2.b <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.hjust = 0.5),
          color = "none")+
   labs(title = 'B', subtitle = (alpha_peak-63)); fig2.b
@@ -599,7 +599,7 @@ fig2.c <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.hjust = 0.5),
          color = "none")+
   labs(title = 'C', subtitle = (alpha_peak-42)); fig2.c
@@ -639,7 +639,7 @@ fig2.d <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.hjust = 0.5),
          color = "none")+
   labs(title = 'D', subtitle = (alpha_peak-21)); fig2.d
@@ -679,7 +679,7 @@ fig2.e <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.hjust = 0.5),
          color = "none")+
   labs(title = 'E', subtitle = (alpha_peak)); fig2.e
@@ -720,7 +720,7 @@ fig2.f <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.hjust = 0.5),
          color = "none")+
   labs(title = 'F', subtitle = (delta_peak-63)); fig2.f
@@ -762,7 +762,7 @@ fig2.g <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.hjust = 0.5),
          color = "none")+
   labs(title = 'G', subtitle = (delta_peak-42)); fig2.g
@@ -802,7 +802,7 @@ fig2.h <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
@@ -843,7 +843,7 @@ fig2.i <- ggplot()+
   theme(legend.position = "bottom",
         legend.title.position = "top",
         legend.key.width = grid::unit(1.6, "cm"))+
-  guides(fill = guide_bins(title = "Estimated Infections/100k/week",
+  guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week",
                            title.position = "top",
                            title.hjust = 0.5),
          color = "none")+
@@ -865,35 +865,35 @@ fig2theme <- theme(legend.position = "right",
                   legend.key.width = grid::unit(1, "cm"))
 
 fig2 <- (((fig2.b + 
-             guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+             guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                     color = "none") + fig2theme | 
              fig2.c + 
-             guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+             guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                     color = "none") +
              fig2theme | 
              fig2.d + 
-             guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+             guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                     color = "none") +
              fig2theme | 
              fig2.e+ 
-             guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+             guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                     color = "none") +
              fig2theme)) / 
            (fig2a+ggtitle('A')) / 
            ((fig2.f+ 
-               guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+               guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                       color = "none") +
                fig2theme | 
                fig2.g+ 
-               guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+               guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                       color = "none") +
                fig2theme | 
                fig2.h+ 
-               guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+               guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                       color = "none") +
                fig2theme | 
                fig2.i+ 
-               guides(fill = guide_bins(title = "Estimated Infections/100k/week"),
+               guides(fill = guide_bins(title = "Estimated infections per 100,000 persons per week"),
                       color = "none") +
                fig2theme))
 )+
