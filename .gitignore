@@ -9,6 +9,8 @@
 .git/objects/9d/38470e8253e1ec96574f1e166ceaa9b382f8df
 .git/objects/9d/d4c98e6dbfa41e57d7e226f7624c2c3d79aaf0
 .git/objects/pack/pack-1911a85efbea1e419d57fd966bd0cf0839f8a9de.pack
+.git/objects/pack/pack-3c67f8a72a360b577f22d007fee7454e3ab1e84a.pack
+.git/objects/pack/pack-6806d415062a6661ec0a5aa724bc9642f1d4b94d.pack
 .git/objects/pack/pack-c56fcdd76e6a815d79be31d9aa2396524ec70aec.pack
 .RData
 .Rhistory
@@ -125,11 +127,14 @@ Data/data-products/boundaryPlots/secondWaveModel/boundaryDatasecond.rds
 Data/data-products/car_hexgrid1100km_run_preomicron_daily_wave2.csv
 Data/data-products/car_TESTING.hexgrid1100km_run_preomicron_daily.csv.gz
 Data/data-products/geo-hexes/hexid-observations_preomicron_hexgrid1100km.csv
+Data/data-products/geo-hexes/hexid-observations_preomicron_intersection_hexgrid1100km.csv
 Data/data-products/geo-hexes/observations_preomicron.dbf
 Data/data-products/geo-hexes/observations_preomicron.shp
 Data/data-products/hex_spacetime.csv
 Data/data-products/hex_spacetimeTESTING.csv
 Data/data-products/hexid-observations_preomicron_meta30m.csv
+Data/data-products/observations_preomicron.dbf
+Data/data-products/observations_preomicron.shp
 Data/data-products/tsa_meta30m_run_preomicron_daily.csv
 Data/data-products/tsa_preomicron.csv
 Data/data-products/wavefronts/boundaryData_firstWave.rds
