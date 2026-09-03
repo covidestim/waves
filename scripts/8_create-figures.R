@@ -427,7 +427,8 @@ ggsave(plot = fig1,
        file = "Figures/fig1.tif",
        width = 9,
        height = 16,
-       dpi = 300
+       dpi = 300, 
+       compression = "lzw"
 )
 
 
@@ -909,7 +910,8 @@ ggsave(plot = fig2,
        filename = "Figures/fig2.tif",
        width = 16, 
        height = 9,
-       dpi = 300)
+       dpi = 300, 
+       compression = "lzw")
 
 ###############################################################################
 ##### FIGURE 3 ################################################################
@@ -969,11 +971,12 @@ ggsave(plot = fig3b, filename = here("figures/extra_figures/fig3b.png"),
        width = 16, height = 9, dpi = 300)
 
 ## Save the two panels together as Figure 3
-ggsave( plot = (fig3a+fig3b) + plot_layout(nrow=2, guides = "collect") & 
-        theme(legend.position = 'bottom',
-              legend.direction = 'horizontal'), 
-        filename = here("figures/fig3.tif"),
-        width = 8.5, height = 11, dpi = 300) 
+fig3 <- (fig3a+theme(legend.position = "none")+fig3b+theme(legend.position = 'bottom',
+                                                           legend.direction = 'horizontal')) + 
+  plot_layout(nrow=2)
+ggsave( plot = fig3, 
+        filename = here::here("figures/fig3.tif"),
+        width = 8.5, height = 11, dpi = 300, compression = "lzw") 
 
 ###############################################################################
 ##### FIGURE 4 ################################################################
@@ -1223,7 +1226,8 @@ ggsave(plot = fig4,
        filename = "figures/fig4.tif",
        width = 9,
        height = 14,
-       dpi = 300)
+       dpi = 300, 
+       compression = "lzw")
 
 ###############################################################################
 ###### Sensitivity Analysis ###################################################
